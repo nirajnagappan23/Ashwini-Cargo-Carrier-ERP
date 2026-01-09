@@ -15,10 +15,10 @@ import SharedTrip from './pages/SharedTrip';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
-  // const isAuth = localStorage.getItem('isLoggedIn') === 'true';
-  // if (!isAuth) {
-  //   return <Navigate to="/login" replace />;
-  // }
+  const isAuth = localStorage.getItem('isLoggedIn') === 'true';
+  if (!isAuth) {
+    return <Navigate to="/login" replace />;
+  }
   return children;
 };
 
