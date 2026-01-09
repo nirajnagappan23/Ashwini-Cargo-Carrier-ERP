@@ -21,17 +21,51 @@ const Login = () => {
         setForgotEmail('');
     };
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
 
-        setTimeout(() => {
-            // Check for Admin (Legacy/Dev)
+        try {
+            // 1. Check if user is Staff/Admin (Supabase Check)
+            // We dynamic import or use the existing supabase instance (assumed imported)
+            // But wait, we need to import supabase at the top. 
+            // Since this tool replaces lines, I need to make sure 'supabase' is available. 
+            // I'll add the import in a separate tool call if needed, but 'supabase' logic here:
+
+            // Note: We need to ensure supabase is imported in the file header.
+            // For now, assuming direct logic replacement.
+
+            // Temporary Admin URL (Replace with your Production Netlify Admin URL later)
+            const ADMIN_URL = window.location.hostname.includes('localhost')
+                ? 'http://localhost:5174'
+                : 'https://admin-ashwini-cargo.netlify.app'; // UPDATE THIS AFTER DEPLOYING ADMIN PANEL
+
+            // Check 'users' table
+            const { data: staffUser } = await import('../supabase').then(module =>
+                module.supabase.from('users').select('*').eq('email', email).single()
+            );
+
+            if (staffUser) {
+                // Verify Password (Simple equality check for MVP)
+                if (staffUser.password === password) {
+                    // Success - Redirect to Admin Panel
+                    window.location.href = ADMIN_URL;
+                    return;
+                } else if (staffUser.password) {
+                    // Metadata exists but password wrong
+                    throw new Error("Invalid staff credentials");
+                }
+            }
+
+            // 2. Legacy/Dev Admin Check (Fallback)
             if (email.toLowerCase().includes('admin') && email.includes('@')) {
-                window.location.href = 'http://localhost:5174?auth=true';
+                window.location.href = ADMIN_URL;
                 return;
             }
+
+            // 3. Client Authentication Logic
+            // (For now, we simulate client login as before, but ideally check 'clients' table)
 
             // Client Mock Authentication
             let companyName = "Valued Client Co.";
@@ -52,15 +86,20 @@ const Login = () => {
             // Set LocalStorage
             localStorage.setItem('userRole', 'client');
             localStorage.setItem('isLoggedIn', 'true');
-            localStorage.setItem('clientName', companyName); // Legacy support
-            localStorage.setItem('clientCompanyName', companyName); // Explicit Company Name
-            localStorage.setItem('clientDisplayName', displayName); // Explicit User Name
+            localStorage.setItem('clientName', companyName);
+            localStorage.setItem('clientCompanyName', companyName);
+            localStorage.setItem('clientDisplayName', displayName);
             localStorage.setItem('clientLoginId', email);
 
             // Redirect
             navigate('/');
             setIsLoading(false);
-        }, 800);
+
+        } catch (err) {
+            console.error("Login Error:", err);
+            setError('Invalid credentials or connection error.');
+            setIsLoading(false);
+        }
     };
 
     return (
