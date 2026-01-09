@@ -39,7 +39,7 @@ const Login = () => {
             // Temporary Admin URL (Replace with your Production Netlify Admin URL later)
             const ADMIN_URL = window.location.hostname.includes('localhost')
                 ? 'http://localhost:5174'
-                : 'https://admin-ashwini-cargo.netlify.app'; // UPDATE THIS AFTER DEPLOYING ADMIN PANEL
+                : 'https://app-ashwinicargocarrier-admin.netlify.app'; // Production Admin URL
 
             // Check 'users' table
             const { data: staffUser } = await import('../supabase').then(module =>
@@ -206,7 +206,10 @@ const Login = () => {
                         <button
                             type="button"
                             onClick={() => {
-                                window.location.href = 'http://localhost:5174?auth=true';
+                                const adminUrl = window.location.hostname.includes('localhost')
+                                    ? 'http://localhost:5174'
+                                    : 'https://app-ashwinicargocarrier-admin.netlify.app';
+                                window.location.href = adminUrl;
                             }}
                             className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
                         >
