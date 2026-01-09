@@ -103,66 +103,66 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden">
-            {/* Background Decoration */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-                <div className="absolute -top-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-100 rounded-full blur-3xl opacity-50"></div>
-                <div className="absolute -bottom-[10%] -left-[10%] w-[50%] h-[50%] bg-blue-50 rounded-full blur-3xl opacity-50"></div>
-            </div>
-
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden z-10 m-4 relative">
-                <div className="p-8 pb-6">
+        <div className="min-h-screen flex items-center justify-center bg-[#0f172a] font-sans p-4">
+            <div className="w-full max-w-[420px] bg-white rounded-2xl shadow-2xl overflow-hidden relative">
+                <div className="p-8 pt-10">
                     <div className="flex justify-center mb-6">
-                        <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
-                            <Truck size={32} className="text-white" />
+                        {/* Logo Placeholder - Matches the yellow icon style */}
+                        <div className="w-16 h-16 bg-amber-100 rounded-xl flex items-center justify-center shadow-inner">
+                            <Truck size={36} className="text-amber-600" />
                         </div>
                     </div>
+
                     <div className="text-center mb-8">
-                        <h1 className="text-2xl font-bold text-slate-800">Welcome Back</h1>
-                        <p className="text-slate-500 text-sm mt-2">Sign in to manage your shipments</p>
+                        <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Welcome to <br />Ashwini Cargo Carrier ERP</h1>
+                        <p className="text-slate-500 text-sm mt-3 font-medium">Sign in to access your dashboard</p>
                     </div>
 
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Login ID</label>
-                            <div className="relative">
-                                <Mail size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                    <form onSubmit={handleLogin} className="space-y-5">
+                        <div className="space-y-1.5">
+                            <label className="block text-sm font-semibold text-slate-700">Login ID (Email)</label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                    <Mail size={20} className="text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                </div>
                                 <input
                                     type="text"
-                                    placeholder="Email or Phone Number"
+                                    placeholder="yourname@ashwinicargo.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700 placeholder:text-slate-400"
                                     required
                                 />
                             </div>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                            <div className="relative">
-                                <Lock size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                        <div className="space-y-1.5">
+                            <label className="block text-sm font-semibold text-slate-700">Password</label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                    <Lock size={20} className="text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                </div>
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     placeholder="Enter your password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className="w-full pl-11 pr-12 py-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700 placeholder:text-slate-400"
                                     required
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
                                 >
                                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
                             </div>
-                            <div className="flex justify-end mt-1">
+                            <div className="flex justify-end">
                                 <button
                                     type="button"
                                     onClick={() => setIsForgotModalOpen(true)}
-                                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                                 >
                                     Forgot Password?
                                 </button>
@@ -170,16 +170,16 @@ const Login = () => {
                         </div>
 
                         {error && (
-                            <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                                {error}
+                            <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-center gap-3">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
+                                <div className="text-sm text-red-600 font-medium">{error}</div>
                             </div>
                         )}
 
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-700/40 transition-all flex items-center justify-center gap-2 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-lg shadow-lg shadow-blue-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 mt-2 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
                             {isLoading ? (
                                 <>
@@ -193,89 +193,78 @@ const Login = () => {
                                 </>
                             )}
                         </button>
-
-                        <div className="relative my-6">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-slate-200"></div>
-                            </div>
-                            <div className="relative flex justify-center text-sm">
-                                <span className="px-2 bg-white text-slate-500">For Staff</span>
-                            </div>
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const adminUrl = window.location.hostname.includes('localhost')
-                                    ? 'http://localhost:5174'
-                                    : 'https://app-ashwinicargocarrier-admin.netlify.app';
-                                window.location.href = adminUrl;
-                            }}
-                            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
-                        >
-                            <Lock size={18} /> Admin Access
-                        </button>
                     </form>
                 </div>
 
-
-
-                {/* No Registration Section - Admin Managed Only */}
-                {/* <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 text-center">
-                    <p className="text-sm text-slate-500">
-                        Accounts are managed by Administration.
+                {/* Footer Section - Matches Image */}
+                <div className="px-8 py-5 bg-slate-50 border-t border-slate-100/80 text-center">
+                    <p className="text-xs text-slate-500 font-medium">
+                        &copy; 2026 Ashwini Cargo Carrier. All rights reserved.
                     </p>
-                </div> */}
+                </div>
             </div>
 
-            <div className="absolute bottom-6 text-slate-400 text-xs text-center w-full">
-                &copy; 2026 Ashwini Cargo Carrier. All rights reserved.
+            {/* Hidden/Subtle Admin Link (Kept for functionality but hidden from main view) */}
+            <div className="absolute bottom-4 right-4 z-20">
+                <button
+                    type="button"
+                    onClick={() => {
+                        const adminUrl = window.location.hostname.includes('localhost')
+                            ? 'http://localhost:5174'
+                            : 'https://app-ashwinicargocarrier-admin.netlify.app';
+                        window.location.href = adminUrl;
+                    }}
+                    className="text-xs text-slate-700/30 hover:text-slate-500 transition-colors flex items-center gap-1.5"
+                >
+                    <Lock size={12} /> Admin
+                </button>
             </div>
 
             {/* Forgot Password Modal */}
-            {
-                isForgotModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative animate-fade-in">
-                            <button
-                                onClick={() => setIsForgotModalOpen(false)}
-                                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
-                            >
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            </button>
+            {isForgotModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
+                        <button
+                            onClick={() => setIsForgotModalOpen(false)}
+                            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
 
-                            <div className="mb-6">
-                                <h3 className="text-xl font-bold text-slate-800 mb-2">Reset Password</h3>
-                                <p className="text-slate-600 text-sm">
-                                    Accounts are managed by the Administration. Please enter your Login ID below to request a password reset.
-                                </p>
+                        <div className="text-center mb-6">
+                            <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <Lock size={24} className="text-blue-600" />
                             </div>
-
-                            <form onSubmit={handleForgotSubmit}>
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Login ID (Email/Phone)</label>
-                                    <input
-                                        type="text"
-                                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Enter your ID"
-                                        value={forgotEmail}
-                                        onChange={(e) => setForgotEmail(e.target.value)}
-                                        autoFocus
-                                        required
-                                    />
-                                </div>
-                                <button
-                                    type="submit"
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-colors"
-                                >
-                                    Send Reset Request
-                                </button>
-                            </form>
+                            <h3 className="text-lg font-bold text-slate-800">Account Recovery</h3>
+                            <p className="text-slate-500 text-sm mt-1 px-2">
+                                For security, account resets are handled manually by our support team.
+                            </p>
                         </div>
+
+                        <form onSubmit={handleForgotSubmit}>
+                            <div className="mb-4">
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Your Login ID</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                    placeholder="name@company.com"
+                                    value={forgotEmail}
+                                    onChange={(e) => setForgotEmail(e.target.value)}
+                                    autoFocus
+                                    required
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-colors"
+                            >
+                                Request Reset
+                            </button>
+                        </form>
                     </div>
-                )
-            }
-        </div >
+                </div>
+            )}
+        </div>
     );
 };
 
