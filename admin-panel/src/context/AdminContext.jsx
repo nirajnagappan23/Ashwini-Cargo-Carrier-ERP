@@ -30,48 +30,57 @@ export const AdminProvider = ({ children }) => {
             status: 'Active',
             lastLogin: '2026-01-08 10:00 AM',
             password: 'Niraj!!123'
-        },
-        {
-            id: 'USR-002',
-            name: 'Rathy',
-            email: 'rathy@ashwinicargo.com',
-            phone: '+91 98000 00002',
-            role: 'Admin',
-            status: 'Active',
-            lastLogin: '2026-01-07 02:30 PM',
-            password: 'admin'
-        },
-        {
-            id: 'USR-003',
-            name: 'Nagappan',
-            email: 'nagappan@ashwinicargo.com',
-            phone: '+91 98000 00003',
-            role: 'Director',
-            status: 'Active',
-            lastLogin: '2026-01-06 11:15 AM',
-            password: 'admin'
-        },
-        {
-            id: 'USR-004',
-            name: 'Sebastian',
-            email: 'sebastian@ashwinicargo.com',
-            phone: '+91 98000 00004',
-            role: 'Manager',
-            status: 'Active',
-            lastLogin: '2026-01-08 09:00 AM',
-            password: 'admin'
-        },
-        {
-            id: 'USR-005',
-            name: 'Bala Murugan',
-            email: 'bala@ashwinicargo.com',
-            phone: '+91 98000 00005',
-            role: 'Manager',
-            status: 'Active',
-            lastLogin: '2026-01-05 04:45 PM',
-            password: 'admin'
         }
     ];
+
+    // ---- HELPERS: DB <-> APP MAPPING ----
+
+    const mapDbOrderToApp = (dbOrder) => ({
+        ...dbOrder,
+        orderId: dbOrder.order_id,
+        orderDate: dbOrder.order_date,
+        clientRef: dbOrder.client_ref,
+        clientName: dbOrder.client_name,
+        clientPhone: dbOrder.client_phone,
+        clientEmail: dbOrder.client_email,
+        tripStatus: dbOrder.trip_status,
+        vehicleType: dbOrder.vehicle_type,
+        totalFreight: dbOrder.total_freight,
+        quoteAmount: dbOrder.quote_amount,
+        clientPrice: dbOrder.client_price,
+        freightRate: dbOrder.freight_rate,
+        freightUnit: dbOrder.freight_unit,
+        payType: dbOrder.pay_type,
+        paymentMode: dbOrder.payment_mode,
+        truckHire: dbOrder.truck_hire,
+        truckAdvancePaid: dbOrder.truck_advance_paid,
+        truckTotalExpenses: dbOrder.truck_total_expenses,
+        truckTotalPaid: dbOrder.truck_total_paid,
+        truckBalance: dbOrder.truck_balance,
+        vehicleNo: dbOrder.vehicle_no,
+        driverName: dbOrder.driver_name,
+        driverPhone: dbOrder.driver_phone,
+        trackingHistory: dbOrder.tracking_history || [],
+        paymentHistory: dbOrder.payment_history || [],
+        truckPaymentHistory: dbOrder.truck_payment_history || [],
+        truckExpenses: dbOrder.truck_expenses || [],
+        documents: dbOrder.documents || [],
+        chats: dbOrder.chats || [],
+        driverPhotos: dbOrder.driver_photos || [],
+        loadingPhotos: dbOrder.loading_photos || [],
+        unloadingPhotos: dbOrder.unloading_photos || [],
+        // Preserve original JSONB/fields if needed
+        pickups: dbOrder.pickups || [],
+        drops: dbOrder.drops || [],
+        materials: dbOrder.materials || [],
+        consignments: dbOrder.consignments || []
+    });
+
+    const mapDbClientToApp = (dbClient) => ({
+        ...dbClient,
+        totalOrders: dbClient.total_orders,
+        pendingPayment: dbClient.pending_payment
+    });
 
     // ---- INITIALIZATION ----
     useEffect(() => {
@@ -79,24 +88,20 @@ export const AdminProvider = ({ children }) => {
             setLoading(true);
             try {
                 // 1. Fetch Users
-                const { data: userData, error: userError } = await supabase.from('users').select('*');
-
-                if (userData && userData.length > 0) {
-                    setUsers(userData);
-                } else {
-                    setUsers(mockUsers);
-                }
+                const { data: userData } = await supabase.from('users').select('*');
+                setUsers(userData && userData.length > 0 ? userData : mockUsers);
 
                 // 2. Fetch Orders
-                const { data: orderData, error: orderError } = await supabase.from('orders').select('*');
-                if (!orderError && orderData && orderData.length > 0) {
-                    // Parse JSON fields if necessary (Supabase returns JSONB as object automatically)
-                    setOrders(orderData);
+                const { data: orderData } = await supabase.from('orders').select('*');
+                if (orderData) {
+                    setOrders(orderData.map(mapDbOrderToApp));
                 }
 
                 // 3. Fetch Clients
-                const { data: clientData, error: clientError } = await supabase.from('clients').select('*');
-                if (!clientError && clientData && clientData.length > 0) setClients(clientData);
+                const { data: clientData } = await supabase.from('clients').select('*');
+                if (clientData) {
+                    setClients(clientData.map(mapDbClientToApp));
+                }
 
             } catch (error) {
                 console.error("Error fetching data from Supabase:", error);
@@ -132,22 +137,6 @@ export const AdminProvider = ({ children }) => {
         try { await supabase.from('users').delete().eq('id', userId); } catch (e) { console.error(e); }
     };
 
-    // Helper to check permissions based on role
-    const getPermissions = (role) => {
-        switch (role) {
-            case 'Master Admin':
-                return { canEdit: true, canDelete: true, canManageUsers: true, canViewMaster: true, canCreateOrders: true };
-            case 'Admin':
-                return { canEdit: true, canDelete: false, canManageUsers: false, canViewMaster: true, canCreateOrders: true };
-            case 'Director':
-                return { canEdit: false, canDelete: false, canManageUsers: false, canViewMaster: true, canCreateOrders: false };
-            case 'Manager':
-                return { canEdit: false, canDelete: false, canManageUsers: false, canViewMaster: false, canCreateOrders: false };
-            default:
-                return { canEdit: false, canDelete: false, canManageUsers: false, canViewMaster: false, canCreateOrders: false };
-        }
-    };
-
     const login = (email, password) => {
         const user = users.find(u => u.email === email && u.password === password);
         if (user) {
@@ -162,11 +151,6 @@ export const AdminProvider = ({ children }) => {
         localStorage.removeItem('adminAuth');
         localStorage.removeItem('adminUser');
         window.location.href = '/login';
-    };
-
-    const getCurrentUser = () => {
-        const userStr = localStorage.getItem('adminUser');
-        return userStr ? JSON.parse(userStr) : null;
     };
 
     // --- Order Logic ---
@@ -188,7 +172,8 @@ export const AdminProvider = ({ children }) => {
         const clientRef = `REF-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
         const { id: orderId, date: orderDate } = generateOrderId();
 
-        const newOrder = {
+        // App Object
+        const newOrderApp = {
             id: newId,
             clientRef,
             orderId,
@@ -198,58 +183,115 @@ export const AdminProvider = ({ children }) => {
             trackingHistory: [{ status: 'Order Confirmed', location: '-', date: new Date().toLocaleString('en-GB'), completed: true }]
         };
 
-        setOrders([...orders, newOrder]);
-        try { await supabase.from('orders').insert([newOrder]); } catch (e) { console.error(e); }
+        // DB Object (Map to Snake Case)
+        const newOrderDB = {
+            id: newId,
+            client_ref: clientRef,
+            order_id: orderId,
+            order_date: orderDate,
+            client_name: orderData.clientName,
+            client_phone: orderData.clientPhone,
+            client_email: orderData.clientEmail,
+            origin: orderData.origin,
+            destination: orderData.destination,
+            trip_status: orderData.tripStatus,
+            status: orderData.status,
+            vehicle_type: orderData.vehicleType,
+            total_freight: orderData.totalFreight,
+            advance: orderData.advance,
+            balance: orderData.balance,
+            quote_amount: orderData.quoteAmount,
+            client_price: orderData.clientPrice,
+            freight_rate: orderData.freightRate,
+            freight_unit: orderData.freightUnit,
+            pay_type: orderData.payType,
+            payment_mode: orderData.paymentMode,
+            truck_hire: 0,
+            truck_advance_paid: 0,
+            truck_total_expenses: 0,
+            truck_total_paid: 0,
+            truck_balance: 0,
+            vehicle_no: orderData.vehicleNo,
+            driver_name: orderData.driverName,
+            driver_phone: orderData.driverPhone,
+            pickups: orderData.pickups || [],
+            drops: orderData.drops || [],
+            materials: orderData.materials || [],
+            consignments: [],
+            tracking_history: [{ status: 'Order Confirmed', location: '-', date: new Date().toLocaleString('en-GB'), completed: true }],
+            documents: [],
+            chats: [],
+            created_at: new Date().toISOString()
+        };
+
+        setOrders([...orders, newOrderApp]);
+        try { await supabase.from('orders').insert([newOrderDB]); } catch (e) { console.error("addOrder Error:", e); }
     };
 
     const updateOrderStatus = async (orderId, status) => {
         setOrders(orders.map(o => o.id === orderId ? { ...o, tripStatus: status } : o));
-        try { await supabase.from('orders').update({ tripStatus: status }).eq('id', orderId); } catch (e) { console.error(e); }
+        try { await supabase.from('orders').update({ trip_status: status }).eq('id', orderId); } catch (e) { console.error(e); }
     };
 
     const updateOrderDetails = async (orderId, updates) => {
         setOrders(orders.map(o => o.id === orderId ? { ...o, ...updates } : o));
-        try { await supabase.from('orders').update(updates).eq('id', orderId); } catch (e) { console.error(e); }
+
+        // Map updates to DB keys
+        const dbUpdates = {};
+        if (updates.vehicleNo !== undefined) dbUpdates.vehicle_no = updates.vehicleNo;
+        if (updates.driverName !== undefined) dbUpdates.driver_name = updates.driverName;
+        if (updates.driverPhone !== undefined) dbUpdates.driver_phone = updates.driverPhone;
+        if (updates.tripStatus !== undefined) dbUpdates.trip_status = updates.tripStatus;
+        if (updates.totalFreight !== undefined) dbUpdates.total_freight = updates.totalFreight;
+        // Add other fields as needed, or use a generic mapper if too many
+        // For now covering key operational fields
+
+        if (Object.keys(dbUpdates).length > 0) {
+            try { await supabase.from('orders').update(dbUpdates).eq('id', orderId); } catch (e) { console.error(e); }
+        }
     };
 
     const addTrackingUpdate = async (orderId, trackingData) => {
         const order = orders.find(o => o.id === orderId);
         const newHistory = [...(order.trackingHistory || []), trackingData];
+
         setOrders(orders.map(o => o.id === orderId ? { ...o, trackingHistory: newHistory } : o));
-        try { await supabase.from('orders').update({ trackingHistory: newHistory }).eq('id', orderId); } catch (e) { console.error(e); }
+
+        try { await supabase.from('orders').update({ tracking_history: newHistory }).eq('id', orderId); } catch (e) { console.error(e); }
     };
 
     const confirmOrder = async (enquiryId, finalPrice) => {
         const { id: orderId, date: orderDate } = generateOrderId();
-        const updates = {
+        const trackingData = { status: 'Order Confirmed', location: '-', date: new Date().toLocaleString('en-GB'), completed: true };
+
+        const updatesApp = {
             orderId,
             orderDate,
             status: 'Confirmed',
             quoteAmount: finalPrice,
             totalFreight: finalPrice,
             tripStatus: 'Loading',
-            trackingHistory: [{ status: 'Order Confirmed', location: '-', date: new Date().toLocaleString('en-GB'), completed: true }]
+            trackingHistory: [trackingData]
         };
-        const order = orders.find(o => o.id === enquiryId);
 
-        setOrders(orders.map(o => o.id === enquiryId ? { ...o, ...updates } : o));
-        try { await supabase.from('orders').update(updates).eq('id', enquiryId); } catch (e) { console.error(e); }
-    };
+        const updatesDB = {
+            order_id: orderId,
+            order_date: orderDate,
+            status: 'Confirmed',
+            quote_amount: finalPrice,
+            total_freight: finalPrice,
+            trip_status: 'Loading',
+            tracking_history: [trackingData]
+        };
 
-    const sendAdminMessage = (orderId, text) => {
-        setOrders(orders.map(o => {
-            if (o.id === orderId) {
-                const newMessage = { sender: 'admin', text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-                return { ...o, chats: [...(o.chats || []), newMessage] };
-            }
-            return o;
-        }));
-        // Note: Chat sync logic omitted for brevity, would follow similar pattern
+        setOrders(orders.map(o => o.id === enquiryId ? { ...o, ...updatesApp } : o));
+        try { await supabase.from('orders').update(updatesDB).eq('id', enquiryId); } catch (e) { console.error(e); }
     };
 
     const addDocument = async (orderId, docData) => {
         const order = orders.find(o => o.id === orderId);
         const newDocs = [...(order.documents || []), { ...docData, date: new Date().toISOString().split('T')[0] }];
+
         setOrders(orders.map(o => o.id === orderId ? { ...o, documents: newDocs } : o));
         try { await supabase.from('orders').update({ documents: newDocs }).eq('id', orderId); } catch (e) { console.error(e); }
     };
@@ -262,10 +304,23 @@ export const AdminProvider = ({ children }) => {
         try { await supabase.from('orders').update({ documents: newDocs }).eq('id', orderId); } catch (e) { console.error(e); }
     };
 
+    const recordPayment = async (orderId, paymentData) => {
+        const order = orders.find(o => o.id === orderId);
+        const newHistory = [...(order.paymentHistory || []), { id: `PAY-${Date.now()}`, ...paymentData, recordedAt: new Date().toISOString() }];
+        const newTotalPaid = (order.advance || 0) + (parseFloat(paymentData.amount) || 0);
+        const newBalance = (order.totalFreight || 0) - newTotalPaid;
+
+        const updatesApp = { paymentHistory: newHistory, advance: newTotalPaid, balance: newBalance };
+        const updatesDB = { payment_history: newHistory, advance: newTotalPaid, balance: newBalance };
+
+        setOrders(orders.map(o => o.id === orderId ? { ...o, ...updatesApp } : o));
+        try { await supabase.from('orders').update(updatesDB).eq('id', orderId); } catch (e) { console.error(e); }
+    };
+
+    // Client Logic (Persisted Correctly)
     const addClient = async (clientData) => {
         const id = `CLT-${String(clients.length + 1).padStart(3, '0')}`;
 
-        // 1. Prepare Client Record (Snake Case for DB)
         const newClientDB = {
             id: id,
             name: clientData.name,
@@ -277,13 +332,10 @@ export const AdminProvider = ({ children }) => {
             pending_payment: 0
         };
 
-        // 2. Prepare User Record (For Login)
-        // We use the 'username' (Login ID) as the email in users table, or fallback to email
-        // and displayName as the name
         const newUserDB = {
-            id: `USR-${Date.now()}`, // Generate a unique ID for the user record
-            email: clientData.username || clientData.email, // Login ID
-            password: clientData.password || 'welcome123', // Default password if missing
+            id: `USR-${Date.now()}`,
+            email: clientData.username || clientData.email,
+            password: clientData.password || 'welcome123',
             name: clientData.displayName || clientData.name,
             role: 'client',
             phone: clientData.phone,
@@ -291,11 +343,6 @@ export const AdminProvider = ({ children }) => {
             last_login: '-'
         };
 
-        // 3. Update Local State (UI)
-        // We keep camelCase for internal app usage if that's what the app expects, 
-        // OR we should align local state with DB state. 
-        // Existing app seems to mix them or expects camelCase. 
-        // Let's store a hybrid or just what we had but with ID.
         const newClientUI = {
             id: id,
             totalOrders: 0,
@@ -305,83 +352,37 @@ export const AdminProvider = ({ children }) => {
 
         setClients([...clients, newClientUI]);
 
-        // 4. Perform Supabase Inserts
         try {
-            // Insert into clients table
             const { error: clientError } = await supabase.from('clients').insert([newClientDB]);
-            if (clientError) {
-                console.error("Error inserting client:", clientError);
-                // Ideally revert state here, but for now we just log
-            }
+            if (clientError) console.error("Error inserting client:", clientError);
 
-            // Insert into users table (so they can login)
             const { error: userError } = await supabase.from('users').insert([newUserDB]);
-            if (userError) {
-                console.error("Error creating client user account:", userError);
-            }
-
+            if (userError) console.error("Error creating client user:", userError);
         } catch (e) {
             console.error("Exception in addClient:", e);
         }
     };
 
     const updateClient = async (clientId, updates) => {
-        // 1. Update UI Optimistically
         setClients(clients.map(c => c.id === clientId ? { ...c, ...updates } : c));
 
         try {
-            // 2. Separate Client profile updates from User credential updates
             const { username, password, displayName, ...clientProfileUpdates } = updates;
-
-            // 3. Update 'clients' table (ignore login credentials which don't exist in this table)
             if (Object.keys(clientProfileUpdates).length > 0) {
                 await supabase.from('clients').update(clientProfileUpdates).eq('id', clientId);
             }
-
-            // 4. Update 'users' table (Credentials)
-            // We need to find the user. We assume users.email matches the *old* username (Login ID)
-            // But we don't have the old username easily here if it wasn't passed. 
-            // We'll skip complex user logic for now to prevent crashing. 
-            // In a real app we'd need a link. 
-            // For now, if username/password changes, we can try to update by client email if it matches?
-            // This part is tricky without a link. We will just Log it.
             if (username || password || displayName) {
-                console.warn("Credential updates for Clients require manual DB sync currently or stricter linking.");
-                // Try basic match: if client has an email, maybe the user has the same email?
-                const client = clients.find(c => c.id === clientId);
-                if (client && client.email) {
-                    // Try to update user where phone matches or something? 
-                    // Leaving safe placeholder.
-                }
+                console.warn("Credential updates for Clients require manual DB sync currently.");
             }
-
         } catch (e) {
             console.error("Error updating client:", e);
         }
     };
 
-    const recordPayment = async (orderId, paymentData) => {
-        const order = orders.find(o => o.id === orderId);
-        const newHistory = [...(order.paymentHistory || []), { id: `PAY-${Date.now()}`, ...paymentData, recordedAt: new Date().toISOString() }];
-        const newTotalPaid = (order.advance || 0) + (parseFloat(paymentData.amount) || 0);
-        const newBalance = (order.totalFreight || 0) - newTotalPaid;
-
-        const updates = { paymentHistory: newHistory, advance: newTotalPaid, balance: newBalance };
-        setOrders(orders.map(o => o.id === orderId ? { ...o, ...updates } : o));
-        try { await supabase.from('orders').update(updates).eq('id', orderId); } catch (e) { console.error(e); }
-    };
-
-    // Missing: Broker logic, addBroker, updateBroker (Keep local for now or add table later)
-    const addBroker = (brokerData) => {
-        const newBroker = { id: `BRK-${String(brokers.length + 1).padStart(3, '0')}`, totalTrips: 0, lastUsed: new Date().toISOString().split('T')[0], ...brokerData };
-        setBrokers([...brokers, newBroker]);
-    };
-
-    // Truck Payment Logic (Connected to Supabase)
+    // Truck Payment Logic
     const recordTruckPayment = async (orderId, paymentData) => {
         const order = orders.find(o => o.id === orderId);
 
-        // 1. Calculate new state
         const newHistory = [...(order.truckPaymentHistory || []), {
             id: `TPAY-${Date.now()}`,
             ...paymentData,
@@ -400,7 +401,7 @@ export const AdminProvider = ({ children }) => {
         const totalPaid = totalAdvances + totalExpenses;
         const truckBalance = updatedTruckHire - totalPaid;
 
-        const updates = {
+        const updatesApp = {
             truckHire: updatedTruckHire,
             truckPaymentHistory: newHistory,
             truckAdvancePaid: totalAdvances,
@@ -409,30 +410,21 @@ export const AdminProvider = ({ children }) => {
             truckBalance: truckBalance
         };
 
-        // 2. Optimistic Update
-        setOrders(orders.map(o => o.id === orderId ? { ...o, ...updates } : o));
+        const updatesDB = {
+            truck_hire: updatedTruckHire,
+            truck_payment_history: newHistory,
+            truck_advance_paid: totalAdvances,
+            truck_total_expenses: totalExpenses,
+            truck_total_paid: totalPaid,
+            truck_balance: truckBalance
+        };
 
-        // 3. Supabase Sync (Note: Requires these columns/jsonb fields in DB)
-        try {
-            // We store history in the 'truck_payment_history' JSON column if it exists, or 'payment_history' if shared?
-            // Actually, we defined a flexible 'orders' table. We should try to update these fields.
-            // If columns don't exist, this might fail silently or error depending on Supabase config.
-            // Best Practice: map to a 'truck_financials' jsonb column if we could, 
-            // but for now we try to update the top-level keys assuming they are JSON or cols.
-            // Since we can't change Schema easily right now, we will assume 'orders' table might accept these if added,
-            // OR we repackage them into a 'metadata' or 'truck_data' JSON column if we had one.
-            // User setup SQL had generic JSONB cols. 
-            // Let's assume we can add them or they might be ignored.
-            // WAIT: We can use the 'truck_data' pattern or just try to update.
-            await supabase.from('orders').update(updates).eq('id', orderId);
-        } catch (e) {
-            console.error("Supabase Sync Error (Truck Payment):", e);
-        }
+        setOrders(orders.map(o => o.id === orderId ? { ...o, ...updatesApp } : o));
+        try { await supabase.from('orders').update(updatesDB).eq('id', orderId); } catch (e) { console.error("Supabase Sync Error (Truck Payment):", e); }
     };
 
     const recordExpense = async (orderId, expenseData) => {
         const order = orders.find(o => o.id === orderId);
-
         const newExpense = {
             id: `EXP-${Date.now()}`,
             ...expenseData,
@@ -440,7 +432,6 @@ export const AdminProvider = ({ children }) => {
         };
 
         const updatedExpenses = [...(order.truckExpenses || []), newExpense];
-
         const totalExpenses = updatedExpenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
         const totalAdvances = (order.truckPaymentHistory || [])
             .filter(p => p.type === 'Advance')
@@ -449,20 +440,26 @@ export const AdminProvider = ({ children }) => {
         const totalPaid = totalAdvances + totalExpenses;
         const truckBalance = (order.truckHire || 0) - totalPaid;
 
-        const updates = {
+        const updatesApp = {
             truckExpenses: updatedExpenses,
             truckTotalExpenses: totalExpenses,
             truckTotalPaid: totalPaid,
             truckBalance: truckBalance
         };
 
-        setOrders(orders.map(o => o.id === orderId ? { ...o, ...updates } : o));
-        try { await supabase.from('orders').update(updates).eq('id', orderId); } catch (e) { console.error(e); }
+        const updatesDB = {
+            truck_expenses: updatedExpenses,
+            truck_total_expenses: totalExpenses,
+            truck_total_paid: totalPaid,
+            truck_balance: truckBalance
+        };
+
+        setOrders(orders.map(o => o.id === orderId ? { ...o, ...updatesApp } : o));
+        try { await supabase.from('orders').update(updatesDB).eq('id', orderId); } catch (e) { console.error(e); }
     };
 
     const updateTruckPayment = async (orderId, paymentId, updatedPaymentData) => {
         const order = orders.find(o => o.id === orderId);
-
         const updatedHistory = (order.truckPaymentHistory || []).map(p =>
             p.id === paymentId ? { ...p, ...updatedPaymentData } : p
         );
@@ -477,7 +474,7 @@ export const AdminProvider = ({ children }) => {
         const totalPaid = totalAdvances + totalExpenses;
         const truckBalance = (order.truckHire || 0) - totalPaid;
 
-        const updates = {
+        const updatesApp = {
             truckPaymentHistory: updatedHistory,
             truckAdvancePaid: totalAdvances,
             truckTotalExpenses: totalExpenses,
@@ -485,18 +482,26 @@ export const AdminProvider = ({ children }) => {
             truckBalance: truckBalance
         };
 
-        setOrders(orders.map(o => o.id === orderId ? { ...o, ...updates } : o));
-        try { await supabase.from('orders').update(updates).eq('id', orderId); } catch (e) { console.error(e); }
-    };
+        const updatesDB = {
+            truck_payment_history: updatedHistory,
+            truck_advance_paid: totalAdvances,
+            truck_total_expenses: totalExpenses,
+            truck_total_paid: totalPaid,
+            truck_balance: truckBalance
+        };
 
+        setOrders(orders.map(o => o.id === orderId ? { ...o, ...updatesApp } : o));
+        try { await supabase.from('orders').update(updatesDB).eq('id', orderId); } catch (e) { console.error(e); }
+    };
 
     const value = {
         orders, clients, setClients, addClient, updateClient,
-        brokers, setBrokers, addBroker,
+        brokers, setBrokers, addBroker: (b) => setBrokers([...brokers, b]), // Placeholder
         updateOrderStatus, updateOrderDetails, addTrackingUpdate, addOrder, confirmOrder,
-        sendAdminMessage, addDocument, deleteDocument, recordPayment,
+        sendAdminMessage: (id, txt) => { }, // Placeholder
+        addDocument, deleteDocument, recordPayment,
         recordTruckPayment, updateTruckPayment, recordExpense,
-        users, addUser, updateUser, deleteUser, getCurrentUser, getPermissions, login, logout
+        users, addUser, updateUser, deleteUser, login, logout
     };
 
     return (

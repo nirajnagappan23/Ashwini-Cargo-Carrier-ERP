@@ -6,19 +6,73 @@ const AppContext = createContext();
 export const AppProvider = ({ children }) => {
     const [enquiries, setEnquiries] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [chats, setChats] = useState([]);
 
-    // Initial Data Fetch (Syncs with Admin Panel's Supabase Data)
+    // ---- MAPPERS ----
+
+    const mapDbOrderToApp = (dbOrder) => ({
+        ...dbOrder,
+        orderId: dbOrder.order_id,
+        orderDate: dbOrder.order_date,
+        clientRef: dbOrder.client_ref,
+        clientName: dbOrder.client_name,
+        clientPhone: dbOrder.client_phone,
+        clientEmail: dbOrder.client_email,
+        tripStatus: dbOrder.trip_status,
+        vehicleType: dbOrder.vehicle_type,
+        totalFreight: dbOrder.total_freight,
+        quoteAmount: dbOrder.quote_amount,
+        clientPrice: dbOrder.client_price,
+        payType: dbOrder.pay_type,
+        paymentMode: dbOrder.payment_mode,
+        trackingHistory: dbOrder.tracking_history || [],
+        paymentHistory: dbOrder.payment_history || [],
+        truckPaymentHistory: dbOrder.truck_payment_history || [], // Less likely needed for client but good to have
+        truckExpenses: dbOrder.truck_expenses || [],
+        documents: dbOrder.documents || [],
+        chats: dbOrder.chats || [],
+        // Preserve JSONB
+        pickups: dbOrder.pickups || [],
+        drops: dbOrder.drops || [],
+        materials: dbOrder.materials || [],
+        consignments: dbOrder.consignments || []
+    });
+
+    const mapAppOrderToDb = (appOrder) => ({
+        id: appOrder.id,
+        order_id: appOrder.orderId,
+        order_date: appOrder.orderDate,
+        client_ref: appOrder.clientRef,
+        client_name: appOrder.clientName,
+        client_phone: appOrder.clientPhone,
+        client_email: appOrder.clientEmail,
+        origin: appOrder.origin,
+        destination: appOrder.destination,
+        trip_status: appOrder.tripStatus,
+        status: appOrder.status,
+        vehicle_type: appOrder.vehicleType,
+        total_freight: appOrder.totalFreight,
+        quote_amount: appOrder.quoteAmount,
+        client_price: appOrder.clientPrice,
+        pay_type: appOrder.payType,
+        payment_mode: appOrder.paymentMode,
+        tracking_history: appOrder.trackingHistory,
+        documents: appOrder.documents,
+        chats: appOrder.chats,
+        pickups: appOrder.pickups,
+        drops: appOrder.drops,
+        materials: appOrder.materials,
+        consignments: appOrder.consignments,
+        created_at: appOrder.created_at || new Date().toISOString()
+    });
+
+    // Initial Data Fetch
     useEffect(() => {
         const fetchClientData = async () => {
-            // For Demo: We will fetch ALL orders for now to simulate the client view
-            // In real app: We would filter by client_id = logged_in_user_id
             try {
                 const { data, error } = await supabase.from('orders').select('*');
                 if (!error && data) {
-                    setEnquiries(data);
-                } else {
-                    // Fallback to empty or specific demo mocked data if DB is empty
-                    // For now, let's just keep it empty if DB is empty to encourage adding data from Admin
+                    setEnquiries(data.map(mapDbOrderToApp));
                 }
             } catch (e) {
                 console.error("Client Data Fetch Error:", e);
@@ -31,46 +85,44 @@ export const AppProvider = ({ children }) => {
     }, []);
 
     const addEnquiry = async (enquiryData) => {
-        // ... (Existing logic to add enquiry - we need to make this write to DB too)
-        // Since the user is 'locking in', we will implement the proper DB write.
-
-        // 1. Prepare new order object compatible with DB schema
+        // Prepare new order object
         const newEnquiry = {
-            id: `ENQ-${Date.now()}`, // Temporary ID
+            id: `ENQ-${Date.now()}`,
             ...enquiryData,
             status: 'Requested',
             created_at: new Date().toISOString(),
-            // Default fields for new enquiry
-            tracking_history: [{ status: 'Enquiry Created', date: new Date().toLocaleString(), completed: true }]
+            trackingHistory: [{ status: 'Enquiry Created', date: new Date().toLocaleString(), completed: true }]
         };
 
         setEnquiries([newEnquiry, ...enquiries]);
 
+        // Map to DB format
+        const dbEnquiry = mapAppOrderToDb(newEnquiry);
+
+        // Remove undefined keys to let DB defaults handling them or avoid errors
+        Object.keys(dbEnquiry).forEach(key => dbEnquiry[key] === undefined && delete dbEnquiry[key]);
+
         try {
-            await supabase.from('orders').insert([newEnquiry]);
+            await supabase.from('orders').insert([dbEnquiry]);
         } catch (e) {
             console.error("Add Enquiry Error:", e);
         }
     };
 
-    // ... (Other helper functions)
-
-
-    const [chats, setChats] = useState([]);
-
     const updateEnquiryStatus = async (id, status, updates = {}) => {
-        // Optimistic UI Update
         setEnquiries(enquiries.map(e => {
             if (e.id === id) {
-                // If confirming, you might want to generate Order ID logic here or let Admin do it.
-                // For simplicity, we just update status.
                 return { ...e, status, ...updates };
             }
             return e;
         }));
 
         try {
-            await supabase.from('orders').update({ status, ...updates }).eq('id', id);
+            // Map common updates
+            const dbUpdates = { status };
+            if (updates.tripStatus) dbUpdates.trip_status = updates.tripStatus;
+
+            await supabase.from('orders').update(dbUpdates).eq('id', id);
         } catch (e) {
             console.error("Update Status Error:", e);
         }
@@ -85,7 +137,6 @@ export const AppProvider = ({ children }) => {
             date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }).replace(/ /g, '-').toUpperCase()
         }];
 
-        // Optimistic
         setEnquiries(enquiries.map(o => o.id === enquiryId ? { ...o, documents: newDocs } : o));
 
         try {
