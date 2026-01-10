@@ -42,6 +42,95 @@ const OrderDetail = () => {
     const [lightboxImages, setLightboxImages] = useState([]);
     const [lightboxIndex, setLightboxIndex] = useState(0);
 
+    // --- OCR SAFE MODE ---
+    const [processingLR, setProcessingLR] = useState(false);
+
+    const handleLRScan = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setProcessingLR(true);
+        try {
+            // DYNAMIC IMPORT: Prevents "White Screen" crash on initial load
+            const { createWorker } = await import('tesseract.js');
+
+            const worker = await createWorker('eng');
+            const ret = await worker.recognize(file);
+            const text = ret.data.text;
+            await worker.terminate();
+
+            console.log("OCR Extracted:", text);
+
+            // --- Parsing Logic (Ashwini Cargo Format) ---
+            const extractValue = (regex) => {
+                const match = text.match(regex);
+                return match ? match[1].trim() : null;
+            };
+
+            const truckNo = extractValue(/Truck\/No\.:\s*([A-Z0-9]+)/i);
+            const driverPhone = extractValue(/Mobile:\s*(\d{10})/);
+            const paymentStatus = extractValue(/Payment Status:\s*(Paid|To Pay)/i);
+            // Freight: Matches 'Total Freight 1,00,000' or 'Total Freight: 100000'
+            const totalFreightRaw = extractValue(/Total Freight[:\s]*([\d,]+)/i);
+            const totalFreight = totalFreightRaw ? parseFloat(totalFreightRaw.replace(/,/g, '')) : null;
+            const consignee = extractValue(/Consignee[:\s]*(.*)/i);
+
+            // --- Review Popup ---
+            let confirmMsg = "Found Details from LR:\n";
+            let foundAny = false;
+
+            if (truckNo) { confirmMsg += `- Truck No: ${truckNo}\n`; foundAny = true; }
+            if (driverPhone) { confirmMsg += `- Driver Phone: ${driverPhone}\n`; foundAny = true; }
+            if (paymentStatus) { confirmMsg += `- Payment Mode: ${paymentStatus}\n`; foundAny = true; }
+            if (totalFreight) { confirmMsg += `- Total Freight: ₹${totalFreight}\n`; foundAny = true; }
+            if (consignee) { confirmMsg += `- Consignee: ${consignee}\n`; foundAny = true; }
+
+            if (!foundAny) {
+                alert("Could not extract clear details. Please check the image quality.");
+                return;
+            }
+
+            confirmMsg += "\nUpdate Order with these details?";
+
+            if (window.confirm(confirmMsg)) {
+                const updates = {};
+                if (truckNo) updates.vehicleNo = truckNo;
+                if (driverPhone) updates.driverPhone = driverPhone;
+                if (paymentStatus) updates.paymentMode = paymentStatus;
+                if (totalFreight) {
+                    updates.totalFreight = totalFreight;
+                    // Auto-Calculate Balance based on Payment Status
+                    if (paymentStatus === 'To Pay') updates.balance = totalFreight;
+                    if (paymentStatus === 'Paid') updates.balance = 0;
+                }
+                // Note: Consignee extraction is tricky for addresses. 
+                // We'll mapped it to 'consignments' update logic conceptually, 
+                // but simpler to just log it or update description for now.
+                // For this MVP, we focus on Trip/Truck details.
+
+                updateOrderDetails(id, updates);
+
+                // Auto-Upload as "Master LR"
+                addDocument(id, {
+                    name: "Master LR (Auto-Scan)",
+                    type: "LR Copy",
+                    uploadedBy: "Admin",
+                    url: URL.createObjectURL(file)
+                });
+
+                // UI Refresh
+                setEditedOrder(prev => ({ ...prev, ...updates }));
+                alert("Order Updated Successfully!");
+            }
+
+        } catch (err) {
+            console.error("OCR Error:", err);
+            alert("Scanner failed to load. Please check your internet connection.");
+        } finally {
+            setProcessingLR(false);
+        }
+    };
+
     const driverPhotos = order.driverPhotos || [];
     const loadingPhotos = order.loadingPhotos || [];
     const unloadingPhotos = order.unloadingPhotos || [];
@@ -185,12 +274,19 @@ const OrderDetail = () => {
                         </p>
                     </div>
                     {canEditDetails && (
-                        <button
-                            className="admin-btn admin-btn-primary"
-                            onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                        >
-                            {isEditing ? <><Save size={16} /> Save Changes</> : <><Edit size={16} /> Edit Order</>}
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <label className="admin-btn admin-btn-outline" style={{ cursor: 'pointer', opacity: processingLR ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Upload size={16} />
+                                {processingLR ? 'Scanning...' : 'Upload Master LR'}
+                                <input type="file" hidden accept="image/*" onChange={handleLRScan} disabled={processingLR} />
+                            </label>
+                            <button
+                                className="admin-btn admin-btn-primary"
+                                onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+                            >
+                                {isEditing ? <><Save size={16} /> Save Changes</> : <><Edit size={16} /> Edit Order</>}
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
