@@ -1,25 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Truck } from 'lucide-react';
+import { Lock, Mail, ArrowRight, AlertCircle, Building2 } from 'lucide-react';
+import erpLogo from '../assets/erp_logo.jpg';
+import { supabase } from '../supabase';
 
 const Login = () => {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
-
-    // Forgot Password State
-    const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
-    const [forgotEmail, setForgotEmail] = useState('');
-
-    const handleForgotSubmit = (e) => {
-        e.preventDefault();
-        alert(`Password reset request for "${forgotEmail}" has been sent to the Admin. You will be contacted shortly.`);
-        setIsForgotModalOpen(false);
-        setForgotEmail('');
-    };
+    const [isLoading, setIsLoading] = useState(false);
+    const [isForgotOpen, setIsForgotOpen] = useState(false);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -27,152 +18,239 @@ const Login = () => {
         setIsLoading(true);
 
         try {
-            // 1. Check if user is Staff/Admin (Supabase Check)
-            // We dynamic import or use the existing supabase instance (assumed imported)
-            // But wait, we need to import supabase at the top. 
-            // Since this tool replaces lines, I need to make sure 'supabase' is available. 
-            // I'll add the import in a separate tool call if needed, but 'supabase' logic here:
-
-            // Note: We need to ensure supabase is imported in the file header.
-            // For now, assuming direct logic replacement.
-
-            // Admin URL Configuration
-            const ADMIN_URL = window.location.hostname.includes('localhost')
-                ? 'http://localhost:5174'
-                : 'https://admin.ashwinicargocarrier.in';
-
-            // Check 'users' table
-            const { data: staffUser } = await import('../supabase').then(module =>
-                module.supabase.from('users').select('*').eq('email', email).single()
-            );
-
-            if (staffUser) {
-                // Verify Password (Simple equality check for MVP)
-                if (staffUser.password === password) {
-                    // Success - Redirect to Admin Panel
-                    window.location.href = ADMIN_URL;
-                    return;
-                } else if (staffUser.password) {
-                    // Metadata exists but password wrong
-                    throw new Error("Invalid staff credentials");
-                }
-            }
-
-            // 2. Legacy/Dev Admin Check (Fallback)
-            if (email.toLowerCase().includes('admin') && email.includes('@')) {
-                window.location.href = ADMIN_URL;
+            // 1. Check strict hardcoded Admin credentials (Anti-Pattern but requested safety check)
+            if (email.toLowerCase().trim() === 'nirajnagappan@gmail.com') {
+                // If user tries to login as Master Admin on CLIENT app, guide them to Admin Panel
+                setError('Admin account detected. Please use the Admin Panel link below.');
+                setIsLoading(false);
                 return;
             }
 
-            // 3. Client Authentication Logic
-            // (For now, we simulate client login as before, but ideally check 'clients' table)
+            // 2. Client Authentication Logic (Supabase)
+            // Query the 'clients' table or 'users' table where role is client
+            // For now, we'll keep the existing logic: Check 'users' table first
 
+            // Check 'users' table (Staff/Admin/Client potentially)
+            const { data: user, error: dbError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', email)
+                .single();
+
+            if (dbError && dbError.code !== 'PGRST116') {
+                throw dbError;
+            }
+
+            if (user) {
+                // If it's a staff/admin user, block them
+                if (user.role === 'admin' || user.role === 'staff') {
+                    setError('Staff/Admin accounts must use the Admin Panel.');
+                    setIsLoading(false);
+                    return;
+                }
+
+                // Verify password (simple check for now as per previous implementation)
+                if (user.password === password) {
+                    localStorage.setItem('userRole', 'client');
+                    localStorage.setItem('isLoggedIn', 'true');
+                    localStorage.setItem('clientName', user.company_name || user.name);
+                    navigate('/');
+                    return;
+                } else {
+                    setError('Invalid password.');
+                    setIsLoading(false);
+                    return;
+                }
+            }
+
+            // 3. Fallback / Client Mock Logic (Preserving previous mock logic if DB fails or for demo)
             // Client Mock Authentication
             let companyName = "Valued Client Co.";
             let displayName = "Client User";
+            let isValidMock = false;
 
-            // Mock Data Logic
             if (email.toLowerCase().includes('ashwini')) {
                 companyName = "Ashwini Steel Works";
                 displayName = "Ramesh Kumar";
+                isValidMock = true;
             } else if (email.toLowerCase().includes('ta')) {
                 companyName = "Tata Motors";
                 displayName = "Suresh Operations";
+                isValidMock = true;
             } else if (email.toLowerCase().includes('demo')) {
                 companyName = "Demo Client Ltd";
-                displayName = "Demo User";
+                isValidMock = true;
             }
 
-            // Set LocalStorage
-            localStorage.setItem('userRole', 'client');
-            localStorage.setItem('isLoggedIn', 'true');
-            localStorage.setItem('clientName', companyName);
-            localStorage.setItem('clientCompanyName', companyName);
-            localStorage.setItem('clientDisplayName', displayName);
-            localStorage.setItem('clientLoginId', email);
+            if (isValidMock) {
+                localStorage.setItem('userRole', 'client');
+                localStorage.setItem('isLoggedIn', 'true');
+                localStorage.setItem('clientName', companyName);
+                localStorage.setItem('clientCompanyName', companyName);
+                localStorage.setItem('clientDisplayName', displayName);
+                navigate('/');
+                return;
+            }
 
-            // Redirect
-            navigate('/');
-            setIsLoading(false);
+            setError('Invalid credentials or account not found.');
 
         } catch (err) {
             console.error("Login Error:", err);
-            setError('Invalid credentials or connection error.');
+            setError('Connection error. Please try again.');
+        } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#0f172a] font-sans p-4">
-            <div className="w-full max-w-[420px] bg-white rounded-2xl shadow-2xl overflow-hidden relative">
-                <div className="p-8 pt-10">
-                    <div className="flex justify-center mb-6">
-                        {/* Logo Placeholder - Matches the yellow icon style */}
-                        <div className="w-16 h-16 bg-amber-100 rounded-xl flex items-center justify-center shadow-inner">
-                            <Truck size={36} className="text-amber-600" />
-                        </div>
+        <div style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            padding: '1rem'
+        }}>
+            <div style={{
+                width: '100%',
+                maxWidth: '420px',
+                padding: '0',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                overflow: 'hidden',
+                borderRadius: '1rem',
+                backgroundColor: 'white'
+            }}>
+                {/* Brand Header */}
+                <div style={{
+                    background: 'white',
+                    padding: '2.5rem 2rem 1rem',
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center'
+                }}>
+                    <div style={{
+                        width: '80px',
+                        height: '80px',
+                        marginBottom: '1.5rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        borderRadius: '1rem',
+                        overflow: 'hidden'
+                    }}>
+                        <img
+                            src={erpLogo}
+                            alt="Ashwini Cargo Logo"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
                     </div>
+                    <h1 style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '800',
+                        color: '#1e293b',
+                        lineHeight: '1.3',
+                        marginBottom: '0.5rem'
+                    }}>
+                        Client Portal Access
+                    </h1>
+                    <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                        Sign in to track your consignments
+                    </p>
+                </div>
 
-                    <div className="text-center mb-8">
-                        <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Welcome to <br />Ashwini Cargo Carrier ERP</h1>
-                        <p className="text-slate-500 text-sm mt-3 font-medium">Sign in to access your dashboard</p>
-                    </div>
-
-                    <form onSubmit={handleLogin} className="space-y-5">
-                        <div className="space-y-1.5">
-                            <label className="block text-sm font-semibold text-slate-700">Login ID (Email)</label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                    <Mail size={20} className="text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                                </div>
+                {/* Login Form */}
+                <div style={{ padding: '2rem', background: 'white' }}>
+                    <form onSubmit={handleLogin}>
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '600', color: '#475569' }}>
+                                Client Login ID
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                                <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                                 <input
                                     type="text"
-                                    placeholder="yourname@ashwinicargo.com"
+                                    required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700 placeholder:text-slate-400"
-                                    required
+                                    placeholder="client@company.com"
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem 0.75rem 2.75rem',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '0.5rem',
+                                        fontSize: '0.95rem',
+                                        transition: 'all 0.2s',
+                                        outline: 'none',
+                                        backgroundColor: '#f8fafc'
+                                    }}
+                                    onFocus={(e) => {
+                                        e.target.style.borderColor = '#3b82f6';
+                                        e.target.style.backgroundColor = 'white';
+                                    }}
+                                    onBlur={(e) => {
+                                        e.target.style.borderColor = '#e2e8f0';
+                                        e.target.style.backgroundColor = '#f8fafc';
+                                    }}
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                            <label className="block text-sm font-semibold text-slate-700">Password</label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                    <Lock size={20} className="text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                                </div>
+                        <div style={{ marginBottom: '1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569' }}>
+                                    Password
+                                </label>
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                                <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                                 <input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="Enter your password"
+                                    type="password"
+                                    required
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-11 pr-12 py-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700 placeholder:text-slate-400"
-                                    required
+                                    placeholder="Enter your password"
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem 0.75rem 2.75rem',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '0.5rem',
+                                        fontSize: '0.95rem',
+                                        transition: 'all 0.2s',
+                                        outline: 'none',
+                                        backgroundColor: '#f8fafc'
+                                    }}
+                                    onFocus={(e) => {
+                                        e.target.style.borderColor = '#3b82f6';
+                                        e.target.style.backgroundColor = 'white';
+                                    }}
+                                    onBlur={(e) => {
+                                        e.target.style.borderColor = '#e2e8f0';
+                                        e.target.style.backgroundColor = '#f8fafc';
+                                    }}
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
-                                >
-                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                                </button>
                             </div>
-                            <div className="flex justify-end">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsForgotModalOpen(true)}
-                                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                                >
-                                    Forgot Password?
-                                </button>
-                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
+                            <button
+                                type="button"
+                                onClick={() => setIsForgotOpen(true)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#2563eb',
+                                    fontSize: '0.85rem',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                    padding: 0
+                                }}
+                            >
+                                Forgot Password?
+                            </button>
                         </div>
 
                         {error && (
-                            <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
-                                <div className="text-sm text-red-600 font-medium">{error}</div>
+                            <div style={{ padding: '0.75rem', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '0.5rem', fontSize: '0.85rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <AlertCircle size={16} /> {error}
                             </div>
                         )}
 
@@ -181,105 +259,109 @@ const Login = () => {
                             disabled={isLoading}
                             style={{
                                 width: '100%',
-                                backgroundColor: isLoading ? '#93c5fd' : '#2563eb',
+                                padding: '0.875rem',
+                                backgroundColor: '#2563eb',
                                 color: 'white',
-                                fontWeight: 'bold',
-                                padding: '0.875rem 1rem',
+                                border: 'none',
                                 borderRadius: '0.5rem',
-                                boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.2)',
-                                transition: 'all 0.2s',
+                                fontWeight: '600',
+                                fontSize: '1rem',
+                                cursor: isLoading ? 'wait' : 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '0.5rem',
-                                marginTop: '0.5rem',
-                                cursor: isLoading ? 'not-allowed' : 'pointer',
-                                opacity: isLoading ? 0.7 : 1,
-                                border: 'none'
+                                transition: 'background 0.2s',
+                                boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)'
                             }}
-                            onMouseEnter={(e) => !isLoading && (e.target.style.backgroundColor = '#1d4ed8')}
-                            onMouseLeave={(e) => !isLoading && (e.target.style.backgroundColor = '#2563eb')}
+                            onMouseOver={(e) => !isLoading && (e.target.style.backgroundColor = '#1d4ed8')}
+                            onMouseOut={(e) => !isLoading && (e.target.style.backgroundColor = '#2563eb')}
                         >
-                            {isLoading ? (
+                            {isLoading ? 'Verifying...' : (
                                 <>
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                    <span>Signing In...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <span>Sign In</span>
-                                    <ArrowRight size={20} />
+                                    Sign In <ArrowRight size={18} />
                                 </>
                             )}
                         </button>
                     </form>
+
+                    {/* Admin Access Link */}
+                    <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0', textAlign: 'center' }}>
+                        <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                            Are you a Staff Member or Administrator?
+                        </p>
+                        <a
+                            href="https://admin.ashwinicargocarrier.in/login"
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                color: '#475569',
+                                fontSize: '0.9rem',
+                                fontWeight: '600',
+                                textDecoration: 'none',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '0.5rem',
+                                border: '1px solid #e2e8f0',
+                                background: '#f8fafc',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.background = '#f1f5f9';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                e.currentTarget.style.background = '#f8fafc';
+                            }}
+                        >
+                            <Building2 size={16} />
+                            Click here for Admin Access
+                        </a>
+                    </div>
                 </div>
 
-                {/* Footer Section - Matches Image */}
-                <div className="px-8 py-5 bg-slate-50 border-t border-slate-100/80 text-center">
-                    <p className="text-xs text-slate-500 font-medium">
-                        &copy; 2026 Ashwini Cargo Carrier. All rights reserved.
+                <div style={{ background: '#f1f5f9', padding: '1rem', textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        © 2026 Ashwini Cargo Carrier. All rights reserved.
                     </p>
                 </div>
             </div>
 
-            {/* Hidden/Subtle Admin Link (Kept for functionality but hidden from main view) */}
-            <div className="absolute bottom-4 right-4 z-20">
-                <button
-                    type="button"
-                    onClick={() => {
-                        const adminUrl = window.location.hostname.includes('localhost')
-                            ? 'http://localhost:5174'
-                            : 'https://admin.ashwinicargocarrier.in';
-                        window.location.href = adminUrl;
-                    }}
-                    className="text-xs text-slate-700/30 hover:text-slate-500 transition-colors flex items-center gap-1.5"
-                >
-                    <Lock size={12} /> Admin
-                </button>
-            </div>
-
             {/* Forgot Password Modal */}
-            {isForgotModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
-                        <button
-                            onClick={() => setIsForgotModalOpen(false)}
-                            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
-                        >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </button>
-
-                        <div className="text-center mb-6">
-                            <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <Lock size={24} className="text-blue-600" />
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-800">Account Recovery</h3>
-                            <p className="text-slate-500 text-sm mt-1 px-2">
-                                For security, account resets are handled manually by our support team.
-                            </p>
+            {isForgotOpen && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+                    display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000,
+                    backdropFilter: 'blur(2px)'
+                }}>
+                    <div style={{ background: 'white', padding: '2rem', borderRadius: '1rem', maxWidth: '400px', width: '90%', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+                        <div style={{ width: '48px', height: '48px', background: '#eff6ff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: '#2563eb' }}>
+                            <Lock size={24} />
                         </div>
-
-                        <form onSubmit={handleForgotSubmit}>
-                            <div className="mb-4">
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Your Login ID</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                    placeholder="name@company.com"
-                                    value={forgotEmail}
-                                    onChange={(e) => setForgotEmail(e.target.value)}
-                                    autoFocus
-                                    required
-                                />
-                            </div>
-                            <button
-                                type="submit"
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-colors"
-                            >
-                                Request Reset
-                            </button>
-                        </form>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1e293b' }}>Account Recovery</h3>
+                        <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                            For security, client access is managed by the Administrator. Please contact support.
+                        </p>
+                        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Support Contact</div>
+                            <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '1rem' }}>+91 99446 73442</div>
+                        </div>
+                        <button
+                            onClick={() => setIsForgotOpen(false)}
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                background: 'white',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '0.5rem',
+                                fontWeight: '600',
+                                color: '#475569',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Close
+                        </button>
                     </div>
                 </div>
             )}
