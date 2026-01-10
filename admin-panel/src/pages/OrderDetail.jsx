@@ -371,6 +371,12 @@ const OrderDetail = () => {
                         }
                     }
 
+                    // Deriving Real Location from History
+                    const lastHistory = order.trackingHistory && order.trackingHistory.length > 0
+                        ? order.trackingHistory[order.trackingHistory.length - 1]
+                        : null;
+                    const activeLocation = lastHistory ? lastHistory.location : '-';
+
                     // Helper for styles
                     const getNodeStyle = (index) => {
                         if (index < activeIndex || isCompleted) return { bg: '#dcfce7', border: '#16a34a', dot: '#16a34a', text: '#16a34a', label: 'Completed' };
@@ -410,6 +416,13 @@ const OrderDetail = () => {
                                 {(() => {
                                     const transitIndex = pickups.length;
                                     const style = getNodeStyle(transitIndex);
+
+                                    // Logic: IF this node is Active (Transit), show the Real Location (e.g. 'Nashik Highway'). 
+                                    // IF it is Passed, show 'Crossed'. IF Pending, show 'Waiting'.
+                                    let displayLoc = 'Waiting';
+                                    if (activeIndex > transitIndex || isCompleted) displayLoc = 'Crossed';
+                                    else if (activeIndex === transitIndex) displayLoc = activeLocation; // The Dynamic Location
+
                                     return (
                                         <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
                                             <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: style.bg, border: '4px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)', outline: `2px solid ${style.border}` }}>
@@ -418,7 +431,7 @@ const OrderDetail = () => {
                                             <div style={{ textAlign: 'center' }}>
                                                 <div style={{ fontSize: '0.75rem', fontWeight: '700', color: style.text, textTransform: 'uppercase', marginBottom: '0.25rem' }}>In Transit</div>
                                                 <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--admin-text)' }}>
-                                                    {isTransit ? (order.currentLocation || 'On Route') : (activeIndex > transitIndex ? 'Crossed' : 'Waiting')}
+                                                    {displayLoc}
                                                 </div>
                                             </div>
                                         </div>
