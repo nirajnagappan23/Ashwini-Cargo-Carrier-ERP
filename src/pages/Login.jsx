@@ -36,10 +36,10 @@ const Login = () => {
             // Note: We need to ensure supabase is imported in the file header.
             // For now, assuming direct logic replacement.
 
-            // Temporary Admin URL (Replace with your Production Netlify Admin URL later)
+            // Admin URL Configuration
             const ADMIN_URL = window.location.hostname.includes('localhost')
                 ? 'http://localhost:5174'
-                : 'https://app-ashwinicargocarrier-admin.netlify.app'; // Production Admin URL
+                : 'https://admin.ashwinicargocarrier.in';
 
             // Check 'users' table
             const { data: staffUser } = await import('../supabase').then(module =>
@@ -211,7 +211,7 @@ const Login = () => {
                     onClick={() => {
                         const adminUrl = window.location.hostname.includes('localhost')
                             ? 'http://localhost:5174'
-                            : 'https://app-ashwinicargocarrier-admin.netlify.app';
+                            : 'https://admin.ashwinicargocarrier.in';
                         window.location.href = adminUrl;
                     }}
                     className="text-xs text-slate-700/30 hover:text-slate-500 transition-colors flex items-center gap-1.5"

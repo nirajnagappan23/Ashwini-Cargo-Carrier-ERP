@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   /* Admin Panel Color System - Exact Match */
   --primary: #1e40af;
