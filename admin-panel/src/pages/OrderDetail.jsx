@@ -42,80 +42,6 @@ const OrderDetail = () => {
     const [lightboxImages, setLightboxImages] = useState([]);
     const [lightboxIndex, setLightboxIndex] = useState(0);
 
-    // OCR State
-    const [processingLR, setProcessingLR] = useState(false);
-
-    const handleLRScan = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        setProcessingLR(true);
-        try {
-            const { createWorker } = await import('tesseract.js');
-            const worker = await createWorker('eng');
-            const ret = await worker.recognize(file);
-            const text = ret.data.text;
-            await worker.terminate();
-
-            console.log("OCR Text:", text);
-
-            // Parsing Logic (Customized for Ashwini Cargo Format)
-            const extractValue = (regex) => {
-                const match = text.match(regex);
-                return match ? match[1].trim() : null;
-            };
-
-            const truckNo = extractValue(/Truck\/No\.:\s*([A-Z0-9]+)/i);
-            const driverPhone = extractValue(/Mobile:\s*(\d{10})/); // Basic 10-digit match
-            const paymentStatus = extractValue(/Payment Status:\s*(Paid|To Pay)/i);
-            const totalFreightRaw = extractValue(/Total Freight\s*([\d,]+)/i);
-            const totalFreight = totalFreightRaw ? parseFloat(totalFreightRaw.replace(/,/g, '')) : null;
-
-            // Confirm Updates
-            let confirmMsg = "Found Details from LR:\n";
-            if (truckNo) confirmMsg += `- Truck No: ${truckNo}\n`;
-            if (driverPhone) confirmMsg += `- Driver Phone: ${driverPhone}\n`;
-            if (paymentStatus) confirmMsg += `- Payment Mode: ${paymentStatus}\n`;
-            if (totalFreight) confirmMsg += `- Total Freight: ₹${totalFreight}\n`;
-
-            confirmMsg += "\nUpdate Order with these details?";
-
-            if (window.confirm(confirmMsg)) {
-                const updates = {};
-                if (truckNo) updates.vehicleNo = truckNo;
-                if (driverPhone) updates.driverPhone = driverPhone;
-                if (paymentStatus) updates.paymentMode = paymentStatus; // Mapped correctly? YES.
-                if (totalFreight) {
-                    updates.totalFreight = totalFreight;
-                    // Logic: If 'Paid', Balance is 0? If 'To Pay', Balance is Total?
-                    // Let's keep it simple: Just update total/balance math logic is usually handled in recordPayment but we can set base values.
-                    // If To Pay, Balance = Total usually.
-                    if (paymentStatus === 'To Pay') updates.balance = totalFreight;
-                    if (paymentStatus === 'Paid') updates.balance = 0; // Assuming fully paid
-                }
-
-                updateOrderDetails(id, updates);
-
-                // Upload the File as "Master LR"
-                addDocument(id, {
-                    name: "Master LR (Sync)",
-                    type: "LR Copy", // or a specific internal type
-                    uploadedBy: "Admin (Auto)",
-                    url: URL.createObjectURL(file) // Mock URL for now
-                });
-
-                // Force a refresh of local state if needed or rely on context
-                setEditedOrder(prev => ({ ...prev, ...updates }));
-            }
-
-        } catch (err) {
-            console.error(err);
-            alert("Failed to scan LR. Please ensure image is clear.");
-        } finally {
-            setProcessingLR(false);
-        }
-    };
-
     const driverPhotos = order.driverPhotos || [];
     const loadingPhotos = order.loadingPhotos || [];
     const unloadingPhotos = order.unloadingPhotos || [];
@@ -259,19 +185,12 @@ const OrderDetail = () => {
                         </p>
                     </div>
                     {canEditDetails && (
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <label className="admin-btn admin-btn-outline" style={{ cursor: 'pointer', opacity: processingLR ? 0.7 : 1 }}>
-                                <Upload size={16} />
-                                {processingLR ? 'Scanning...' : 'Upload Master LR'}
-                                <input type="file" hidden accept="image/*" onChange={handleLRScan} disabled={processingLR} />
-                            </label>
-                            <button
-                                className="admin-btn admin-btn-primary"
-                                onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                            >
-                                {isEditing ? <><Save size={16} /> Save Changes</> : <><Edit size={16} /> Edit Order</>}
-                            </button>
-                        </div>
+                        <button
+                            className="admin-btn admin-btn-primary"
+                            onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+                        >
+                            {isEditing ? <><Save size={16} /> Save Changes</> : <><Edit size={16} /> Edit Order</>}
+                        </button>
                     )}
                 </div>
             </div>
