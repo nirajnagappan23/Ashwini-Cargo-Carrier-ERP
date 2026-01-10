@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAdmin } from '../context/AdminContext';
 import { ArrowLeft, Edit, Save, Upload, Phone, Truck, MapPin, FileText, Plus, Eye, Trash2, X, CheckCircle, Clock, Package, CreditCard, Camera } from 'lucide-react';
 import ImageLightbox from '../components/ImageLightbox';
-import { createWorker } from 'tesseract.js';
 
 const OrderDetail = () => {
     const { id } = useParams();
@@ -52,6 +51,7 @@ const OrderDetail = () => {
 
         setProcessingLR(true);
         try {
+            const { createWorker } = await import('tesseract.js');
             const worker = await createWorker('eng');
             const ret = await worker.recognize(file);
             const text = ret.data.text;
