@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAdmin } from '../context/AdminContext';
 import { ArrowLeft, Edit, Save, Upload, Phone, Truck, MapPin, FileText, Plus, Eye, Trash2, X, CheckCircle, Clock, Package, CreditCard, Camera } from 'lucide-react';
 import ImageLightbox from '../components/ImageLightbox';
+import { parseLR } from '../utils/lrParser';
+import { Scan, Lock, Shield, FileCheck } from 'lucide-react';
 
 const OrderDetail = () => {
     const { id } = useParams();
@@ -78,7 +80,6 @@ const OrderDetail = () => {
         setLightboxOpen(true);
     };
 
-    // Payment Modal State
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [paymentForm, setPaymentForm] = useState({
         type: 'Advance',
@@ -87,6 +88,86 @@ const OrderDetail = () => {
         date: new Date().toISOString().split('T')[0],
         notes: ''
     });
+
+    // LR Scanning State
+    const [scanning, setScanning] = useState(false);
+
+    const handleLRUpload = async (e, type) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // 1. Upload the File (Mock URL for now, real app would upload to Storage)
+        // In a real implementation: const url = await uploadToStorage(file);
+        const mockUrl = URL.createObjectURL(file); // Temporary blob URL for demo
+
+        // 2. Add to Documents
+        const docName = type === 'LR Master Copy' ? `LR-${order.lrNumber}-MASTER` : `LR-${order.lrNumber}-SAFE`;
+
+        await addDocument(id, {
+            name: docName,
+            type: type,
+            uploadedBy: 'Admin',
+            url: mockUrl,
+            visibility: type === 'LR Master Copy' ? 'admin' : 'public' // Smart Visibility
+        });
+
+        // 3. Scan & Sync (Only for Master Copy)
+        if (type === 'LR Master Copy') {
+            if (window.confirm("LR Master Copy Uploaded. \n\nDo you want to AUTO-SCAN this image to fill Trip Details (Truck, Freight, Consignee)?")) {
+                setScanning(true);
+                try {
+                    const result = await parseLR(file);
+
+                    // Prepare Confirmation Message
+                    const msg = `
+SCAN RESULTS:
+----------------
+LR No: ${result.lrNumber || '-'}
+Truck: ${result.vehicleNo || '-'}
+Consignee: ${result.consigneeName || '-'}
+Freight: ${result.totalFreight || '-'}
+Pay Mode: ${result.paymentMode || '-'}
+Description: ${result.description ? 'Found' : '-'}
+
+Click OK to UPDATE these details in the Order.
+                    `;
+
+                    if (window.confirm(msg)) {
+                        // Merge Data
+                        const updates = {};
+                        if (result.totalFreight) {
+                            updates.totalFreight = result.totalFreight;
+                            // Recalc default Balance assuming 0 advance if not present
+                            updates.balance = result.totalFreight - (order.advance || 0);
+                        }
+                        if (result.vehicleNo) updates.vehicleNo = result.vehicleNo;
+                        if (result.paymentMode) updates.paymentMode = result.paymentMode;
+
+                        // Handle Description (Append or Set)
+                        if (result.description) {
+                            // We save this into a special field or generic notes? 
+                            // User asked for "Description (Official Name)". 
+                            // We'll map it to 'materialDescription' if it exists, or 'notes'.
+                            // Let's use 'description' field.
+                            updates.description = result.description;
+                        }
+
+                        await updateOrderDetails(id, updates);
+                        alert("Trip Details Updated Successfully!");
+
+                        // Reload or re-fetch happens via Context automatically
+                    }
+
+                } catch (error) {
+                    alert("OCR Scan Failed: " + error.message);
+                } finally {
+                    setScanning(false);
+                }
+            }
+        } else {
+            alert("LR Safe Copy Uploaded. This version will be visible to clients when appropriate.");
+        }
+    };
 
     if (!order) {
         return <div className="admin-card">Order not found</div>;
@@ -750,7 +831,78 @@ const OrderDetail = () => {
 
             {/* Document Upload Section */}
             <div className="admin-card">
-                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1.5rem' }}>Document Management</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Document Management</h3>
+                    <button
+                        onClick={() => { setSelectedDocType('Custom'); setUploadModalOpen(true); }}
+                        className="admin-btn admin-btn-outline"
+                        style={{ fontSize: '0.8rem' }}
+                    >
+                        <Plus size={16} /> Add Other Doc
+                    </button>
+                </div>
+
+                {/* SMART LR UPLOAD SECTION */}
+                <div style={{ marginBottom: '2rem', padding: '1.5rem', background: '#f8fafc', borderRadius: '0.75rem', border: '2px dashed #cbd5e1' }}>
+                    <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Scan size={20} color="var(--admin-primary)" />
+                        <h4 style={{ fontWeight: '600', color: '#334155' }}>Smart LR Management (OCR Embedded)</h4>
+                    </div>
+
+                    {scanning ? (
+                        <div style={{ textAlign: 'center', padding: '2rem' }}>
+                            <div className="animate-spin inline-block w-8 h-8 border-4 border-current border-t-transparent text-blue-600 rounded-full" role="status" aria-label="loading"></div>
+                            <div style={{ marginTop: '0.5rem', fontWeight: '600', color: '#3b82f6' }}>Scanning LR & Extracting Data...</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Please wait, reading freight & consignee details.</div>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+                            {/* SLOT A: MASTER COPY */}
+                            <div style={{ background: 'white', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #bfdbfe', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', boxShadow: '0 2px 4px rgba(59, 130, 246, 0.05)' }}>
+                                <div style={{ width: '40px', height: '40px', background: '#eff6ff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <FileCheck size={20} color="#2563eb" />
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ fontWeight: '600', color: '#1e3a8a' }}>LR Master Copy (With Rates)</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>Auto-scans for Truck, Freight & Address. Visible to You & Payer.</div>
+                                </div>
+                                <div style={{ position: 'relative', overflow: 'hidden', display: 'inline-block' }}>
+                                    <button className="admin-btn admin-btn-primary" style={{ pointerEvents: 'none' }}>
+                                        <Scan size={16} /> Upload & Auto-Scan
+                                    </button>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => handleLRUpload(e, 'LR Master Copy')}
+                                        style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* SLOT B: SAFE COPY */}
+                            <div style={{ background: 'white', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                                <div style={{ width: '40px', height: '40px', background: '#f1f5f9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Shield size={20} color="#64748b" />
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ fontWeight: '600', color: '#334155' }}>LR Safe Copy (No Rates)</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>For Public/Shared Links. Hides freight charges.</div>
+                                </div>
+                                <div style={{ position: 'relative', overflow: 'hidden', display: 'inline-block' }}>
+                                    <button className="admin-btn admin-btn-outline" style={{ pointerEvents: 'none', background: 'white' }}>
+                                        <Upload size={16} /> Upload Safe Copy
+                                    </button>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => handleLRUpload(e, 'LR Safe Copy')}
+                                        style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 {/* Uploded Client Documents List */}
                 <div style={{ marginBottom: '2rem' }}>

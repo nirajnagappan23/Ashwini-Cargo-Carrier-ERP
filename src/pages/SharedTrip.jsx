@@ -370,13 +370,13 @@ const SharedTrip = () => {
                     <h4 style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--admin-text-light)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
                         TRANSPORT DOCUMENTS (Client View)
                     </h4>
-                    {(!trip.documents || trip.documents.filter(d => (d.type === 'Lorry Receipt' || d.type === 'LR' || d.name.includes('LR'))).length === 0) ? (
+                    {(!trip.documents || trip.documents.filter(d => (d.type === 'LR Safe Copy' || d.type === 'Lorry Receipt' || d.type === 'LR' || d.name.includes('LR')) && d.visibility !== 'admin' && !d.name.includes('MASTER')).length === 0) ? (
                         <div style={{ fontSize: '0.875rem', color: 'var(--admin-text-light)', fontStyle: 'italic', padding: '1rem', background: 'var(--admin-bg)', borderRadius: '0.5rem' }}>
                             No LR document available.
                         </div>
                     ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-                            {trip.documents.filter(d => (d.type === 'Lorry Receipt' || d.type === 'LR' || d.name.includes('LR'))).map((doc, idx) => (
+                            {trip.documents.filter(d => (d.type === 'LR Safe Copy' || d.type === 'Lorry Receipt' || d.type === 'LR' || d.name.includes('LR')) && d.visibility !== 'admin' && !d.name.includes('MASTER')).map((doc, idx) => (
                                 <div key={idx} style={{ padding: '1rem', border: '1px solid var(--admin-border)', borderRadius: '0.5rem', background: 'white', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                         <div style={{ padding: '0.5rem', borderRadius: '0.5rem', background: '#e0f2fe', color: '#0369a1' }}>
