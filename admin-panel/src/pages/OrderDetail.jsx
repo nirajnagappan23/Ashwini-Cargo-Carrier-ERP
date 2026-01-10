@@ -329,54 +329,124 @@ const OrderDetail = () => {
                     )}
                 </div>
 
-                {/* Shipment Tracking (Horizontal) */}
-                <div className="admin-card" style={{ overflowX: 'auto' }}>
-                    <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--admin-text-light)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <MapPin size={14} /> SHIPMENT TRACKING
-                    </h3>
+                {/* Shipment Tracking (Horizontal) - Refactored for Proper State */}
+                {(() => {
+                    // Logic to determine active stage index
+                    // Stages: 0-(N-1) Pickups, N Transit, (N+1)-(N+M) Drops
+                    const pickups = order.pickups || [];
+                    const drops = order.drops || [];
+                    const totalStages = pickups.length + 1 + drops.length;
 
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', minWidth: '600px', padding: '0 1rem' }}>
-                        {/* Connecting Line - Absolute */}
-                        <div style={{ position: 'absolute', top: '16px', left: '40px', right: '40px', height: '2px', background: '#e2e8f0', zIndex: 0 }}></div>
+                    let activeIndex = 0; // Default ot first pickup
+                    let isTransit = false;
+                    let isCompleted = false;
 
-                        {/* Pickups */}
-                        {order.pickups && order.pickups.map((p, i) => (
-                            <div key={`p-${i}`} style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#dcfce7', border: '4px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }}>
-                                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#16a34a' }}></div>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Pickup {i + 1}</div>
-                                    <div style={{ fontWeight: '600', color: 'var(--admin-primary)', fontSize: '0.875rem' }}>{p.city}</div>
-                                </div>
-                            </div>
-                        ))}
+                    const status = order.tripStatus || '';
 
-                        {/* In Transit Node */}
-                        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#dbeafe', border: '4px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }}>
-                                <Truck size={14} style={{ color: '#3b82f6' }} />
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#3b82f6', textTransform: 'uppercase', marginBottom: '0.25rem' }}>In Transit</div>
-                                <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--admin-text)' }}>{order.currentLocation || 'Nashik Highway'}</div>
+                    // 1. Check Pickups
+                    // If status is "Loading (City)" or "Despatched (City)"
+                    let foundInPickups = false;
+                    pickups.forEach((p, i) => {
+                        if (status.includes(p.city)) {
+                            activeIndex = i;
+                            foundInPickups = true;
+                        }
+                    });
+
+                    // 2. Check Transit
+                    if (!foundInPickups) {
+                        if (status === 'In Transit') {
+                            activeIndex = pickups.length;
+                            isTransit = true;
+                        } else if (status.includes('Unloading') || status.includes('Delivered')) {
+                            // Check Drops
+                            drops.forEach((d, i) => {
+                                if (status.includes(d.city)) {
+                                    activeIndex = pickups.length + 1 + i;
+                                }
+                            });
+                        } else if (status === 'Closed' || status === 'Pod Received') {
+                            activeIndex = totalStages; // All done
+                            isCompleted = true;
+                        }
+                    }
+
+                    // Helper for styles
+                    const getNodeStyle = (index) => {
+                        if (index < activeIndex || isCompleted) return { bg: '#dcfce7', border: '#16a34a', dot: '#16a34a', text: '#16a34a', label: 'Completed' };
+                        if (index === activeIndex) return { bg: '#dbeafe', border: '#3b82f6', dot: '#3b82f6', text: '#3b82f6', label: 'Active' }; // Blue (Active)
+                        return { bg: '#f1f5f9', border: '#cbd5e1', dot: '#cbd5e1', text: '#94a3b8', label: 'Pending' }; // Gray (Pending)
+                    };
+
+                    return (
+                        <div className="admin-card" style={{ overflowX: 'auto' }}>
+                            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--admin-text-light)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <MapPin size={14} /> SHIPMENT TRACKING
+                            </h3>
+
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', minWidth: '600px', padding: '0 1rem' }}>
+                                {/* Connecting Line */}
+                                <div style={{ position: 'absolute', top: '16px', left: '40px', right: '40px', height: '2px', background: '#e2e8f0', zIndex: 0 }}></div>
+                                {/* Fill Line based on progress? Hard to do perfectly with flex, assume simple gray line behind is enough, or we can use gradient if needed. Gray is fine for MVP. */}
+
+                                {/* Pickups */}
+                                {pickups.map((p, i) => {
+                                    const style = getNodeStyle(i);
+                                    return (
+                                        <div key={`p-${i}`} style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: style.bg, border: '4px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)', outline: `2px solid ${style.border}` }}>
+                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: style.dot }}></div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '0.75rem', fontWeight: '700', color: style.text, textTransform: 'uppercase', marginBottom: '0.25rem' }}>Pickup {i + 1}</div>
+                                                <div style={{ fontWeight: '600', color: 'var(--admin-primary)', fontSize: '0.875rem' }}>{p.city}</div>
+                                                {i === activeIndex && <div style={{ fontSize: '0.7rem', color: style.text }}>(Current)</div>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {/* In Transit Node */}
+                                {(() => {
+                                    const transitIndex = pickups.length;
+                                    const style = getNodeStyle(transitIndex);
+                                    return (
+                                        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: style.bg, border: '4px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)', outline: `2px solid ${style.border}` }}>
+                                                <Truck size={14} style={{ color: style.text }} />
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '0.75rem', fontWeight: '700', color: style.text, textTransform: 'uppercase', marginBottom: '0.25rem' }}>In Transit</div>
+                                                <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--admin-text)' }}>
+                                                    {isTransit ? (order.currentLocation || 'On Route') : (activeIndex > transitIndex ? 'Crossed' : 'Waiting')}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Drops */}
+                                {drops.map((d, i) => {
+                                    const dropIndex = pickups.length + 1 + i;
+                                    const style = getNodeStyle(dropIndex);
+                                    return (
+                                        <div key={`d-${i}`} style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: style.bg, border: '4px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)', outline: `2px solid ${style.border}` }}>
+                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: style.dot }}></div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '0.75rem', fontWeight: '700', color: style.text, textTransform: 'uppercase', marginBottom: '0.25rem' }}>Delivery {i + 1}</div>
+                                                <div style={{ fontWeight: '600', color: 'var(--admin-primary)', fontSize: '0.875rem' }}>{d.city}</div>
+                                                {dropIndex === activeIndex && <div style={{ fontSize: '0.7rem', color: style.text }}>(Current)</div>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
                             </div>
                         </div>
-
-                        {/* Drops */}
-                        {order.drops && order.drops.map((d, i) => (
-                            <div key={`d-${i}`} style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fee2e2', border: '4px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }}>
-                                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#dc2626' }}></div>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#dc2626', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Delivery {i + 1}</div>
-                                    <div style={{ fontWeight: '600', color: 'var(--admin-primary)', fontSize: '0.875rem' }}>{d.city}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                    );
+                })()}
                 {/* Status Update */}
                 {canUpdateStatus && (
                     <div className="admin-card">
