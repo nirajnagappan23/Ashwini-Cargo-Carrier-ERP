@@ -179,7 +179,26 @@ const Login = () => {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-lg shadow-lg shadow-blue-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 mt-2 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            style={{
+                                width: '100%',
+                                backgroundColor: isLoading ? '#93c5fd' : '#2563eb',
+                                color: 'white',
+                                fontWeight: 'bold',
+                                padding: '0.875rem 1rem',
+                                borderRadius: '0.5rem',
+                                boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.2)',
+                                transition: 'all 0.2s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                marginTop: '0.5rem',
+                                cursor: isLoading ? 'not-allowed' : 'pointer',
+                                opacity: isLoading ? 0.7 : 1,
+                                border: 'none'
+                            }}
+                            onMouseEnter={(e) => !isLoading && (e.target.style.backgroundColor = '#1d4ed8')}
+                            onMouseLeave={(e) => !isLoading && (e.target.style.backgroundColor = '#2563eb')}
                         >
                             {isLoading ? (
                                 <>
