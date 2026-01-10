@@ -50,6 +50,22 @@ const OrderDetail = () => {
         if (!file) return;
 
         setProcessingLR(true);
+
+        // Handle PDF - Upload Only (No OCR)
+        if (file.type === 'application/pdf') {
+            if (window.confirm("Auto-Scan is availble for Images only. Do you want to upload this PDF as 'Master LR' without extracting data?")) {
+                addDocument(id, {
+                    name: "Master LR (PDF)",
+                    type: "LR Copy",
+                    uploadedBy: "Admin",
+                    url: URL.createObjectURL(file)
+                });
+                alert("Master LR PDF uploaded successfully.");
+            }
+            setProcessingLR(false);
+            return;
+        }
+
         try {
             // DYNAMIC IMPORT: Prevents "White Screen" crash on initial load
             const { createWorker } = await import('tesseract.js');
@@ -278,7 +294,7 @@ const OrderDetail = () => {
                             <label className="admin-btn admin-btn-outline" style={{ cursor: 'pointer', opacity: processingLR ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <Upload size={16} />
                                 {processingLR ? 'Scanning...' : 'Upload Master LR'}
-                                <input type="file" hidden accept="image/*" onChange={handleLRScan} disabled={processingLR} />
+                                <input type="file" hidden accept="image/*,application/pdf" onChange={handleLRScan} disabled={processingLR} />
                             </label>
                             <button
                                 className="admin-btn admin-btn-primary"
