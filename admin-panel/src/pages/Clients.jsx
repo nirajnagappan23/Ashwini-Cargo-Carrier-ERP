@@ -40,7 +40,7 @@ const Clients = () => {
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         // Ensure login ID (username variable) is set
@@ -50,10 +50,14 @@ const Clients = () => {
             displayName: newClient.displayName || newClient.name // Fallback to company name if empty
         };
 
-        addClient(clientData);
-        setIsModalOpen(false);
-        setNewClient({ name: '', phone: '', email: '', address: '', gst: '', username: '', displayName: '', password: '' });
-        setUsernameType('email');
+        try {
+            await addClient(clientData);
+            setIsModalOpen(false);
+            setNewClient({ name: '', phone: '', email: '', address: '', gst: '', username: '', displayName: '', password: '' });
+            setUsernameType('email');
+        } catch (error) {
+            alert('Failed to save data. Please check if RLS policies are blocking writes in Supabase. Error: ' + error.message);
+        }
     };
 
     const handleEditCredentials = (client) => {

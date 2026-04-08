@@ -115,7 +115,7 @@ alter table public.orders enable row level security;
 alter table public.clients enable row level security;
 alter table public.brokers enable row level security;
 
-create policy "Enable all access for users" on public.users for all using (true);
-create policy "Enable all access for orders" on public.orders for all using (true);
-create policy "Enable all access for clients" on public.clients for all using (true);
-create policy "Enable all access for brokers" on public.brokers for all using (true);
+create policy "Enable all access for users" on public.users for all using (true) with check (true);
+create policy "Enable all access for orders" on public.orders for all using (true) with check (true);
+create policy "Enable all access for clients" on public.clients for all using (true) with check (true);
+create policy "Enable all access for brokers" on public.brokers for all using (true) with check (true);

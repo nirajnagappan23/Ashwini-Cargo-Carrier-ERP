@@ -31,6 +31,13 @@ export const AppProvider = ({ children }) => {
         truckExpenses: dbOrder.truck_expenses || [],
         documents: dbOrder.documents || [],
         chats: dbOrder.chats || [],
+        // Ensure route exists
+        route: dbOrder.route || (dbOrder.origin && dbOrder.destination ? `${dbOrder.origin} -> ${dbOrder.destination}` : 'Unknown Route'),
+
+        // Ensure status and critical fields exist
+        status: dbOrder.status || (dbOrder.trip_status ? 'Confirmed' : 'Requested'),
+        lrNumber: dbOrder.lr_number || dbOrder.id, // Fallback to ID if lr_number missing
+
         // Preserve JSONB
         pickups: dbOrder.pickups || [],
         drops: dbOrder.drops || [],
@@ -94,18 +101,17 @@ export const AppProvider = ({ children }) => {
             trackingHistory: [{ status: 'Enquiry Created', date: new Date().toLocaleString(), completed: true }]
         };
 
-        setEnquiries([newEnquiry, ...enquiries]);
-
-        // Map to DB format
-        const dbEnquiry = mapAppOrderToDb(newEnquiry);
-
-        // Remove undefined keys to let DB defaults handling them or avoid errors
-        Object.keys(dbEnquiry).forEach(key => dbEnquiry[key] === undefined && delete dbEnquiry[key]);
-
         try {
-            await supabase.from('orders').insert([dbEnquiry]);
+            const { error } = await supabase.from('orders').insert([dbEnquiry]);
+            if (error) {
+                console.error("Supabase Insert Error:", error);
+                throw new Error("Failed to save enquiry: " + error.message);
+            }
+            // Only update UI if DB insertion successful
+            setEnquiries([newEnquiry, ...enquiries]);
         } catch (e) {
             console.error("Add Enquiry Error:", e);
+            throw e;
         }
     };
 

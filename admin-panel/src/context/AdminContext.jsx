@@ -368,16 +368,25 @@ export const AdminProvider = ({ children }) => {
             ...clientData
         };
 
-        setClients([...clients, newClientUI]);
-
         try {
             const { error: clientError } = await supabase.from('clients').insert([newClientDB]);
-            if (clientError) console.error("Error inserting client:", clientError);
+            if (clientError) {
+                console.error("Error inserting client:", clientError);
+                throw new Error("Client DB Error: " + clientError.message);
+            }
 
             const { error: userError } = await supabase.from('users').insert([newUserDB]);
-            if (userError) console.error("Error creating client user:", userError);
+            if (userError) {
+                console.error("Error creating client user:", userError);
+                throw new Error("User DB Error: " + userError.message);
+            }
+            
+            // Only update local UI state if database insertions succeed completely
+            setClients([...clients, newClientUI]);
+
         } catch (e) {
             console.error("Exception in addClient:", e);
+            throw e;
         }
     };
 

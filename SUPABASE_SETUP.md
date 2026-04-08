@@ -75,9 +75,9 @@ alter table public.orders enable row level security;
 alter table public.clients enable row level security;
 
 -- ALLOW ALL (For initial dev phase - we will lock this down later)
-create policy "Enable all access for now" on public.users for all using (true);
-create policy "Enable all access for now" on public.orders for all using (true);
-create policy "Enable all access for now" on public.clients for all using (true);
+create policy "Enable all access for now" on public.users for all using (true) with check (true);
+create policy "Enable all access for now" on public.orders for all using (true) with check (true);
+create policy "Enable all access for now" on public.clients for all using (true) with check (true);
 ```
 
 ## Step 4: Configure Storage (For Images/Docs)
