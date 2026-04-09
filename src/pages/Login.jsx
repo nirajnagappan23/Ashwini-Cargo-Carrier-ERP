@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, AlertCircle, Building2 } from 'lucide-react';
 import erpLogo from '../assets/erp_logo.jpg';
 import { supabase } from '../supabase';
@@ -18,85 +17,68 @@ const Login = () => {
         setIsLoading(true);
 
         try {
-            // 1. Check strict hardcoded Admin credentials (Anti-Pattern but requested safety check)
-            if (email.toLowerCase().trim() === 'nirajnagappan@gmail.com') {
-                // If user tries to login as Master Admin on CLIENT app, guide them to Admin Panel
+            const loginId = email.trim(); // supports email OR phone number as login ID
+
+            // Block master admin from using client portal
+            if (loginId.toLowerCase() === 'nirajnagappan@gmail.com') {
                 setError('Admin account detected. Please use the Admin Panel link below.');
-                setIsLoading(false);
                 return;
             }
 
-            // 2. Client Authentication Logic (Supabase)
-            // Query the 'clients' table or 'users' table where role is client
-            // For now, we'll keep the existing logic: Check 'users' table first
-
-            // Check 'users' table (Staff/Admin/Client potentially)
-            const { data: user, error: dbError } = await supabase
+            // Query users table — use array result (avoid .single() which swallows PGRST116)
+            const { data: matchedUsers, error: dbError } = await supabase
                 .from('users')
                 .select('*')
-                .eq('email', email)
-                .single();
+                .eq('email', loginId); // 'email' column stores the login ID (could be email or phone)
 
-            if (dbError && dbError.code !== 'PGRST116') {
-                throw dbError;
+            console.log('[ClientLogin] query result:', { matchedUsers, dbError, loginId });
+
+            if (dbError) {
+                // Could be RLS blocking reads — see Supabase note below
+                console.error('[ClientLogin] Supabase error:', dbError);
+                throw new Error('Unable to verify credentials. Please contact support.');
             }
 
-            if (user) {
-                // If it's a staff/admin user, block them
-                if (user.role === 'admin' || user.role === 'staff') {
-                    setError('Staff/Admin accounts must use the Admin Panel.');
-                    setIsLoading(false);
+            if (!matchedUsers || matchedUsers.length === 0) {
+                // Try case-insensitive email match as fallback
+                const { data: altUsers } = await supabase
+                    .from('users')
+                    .select('*')
+                    .ilike('email', loginId);
+
+                if (!altUsers || altUsers.length === 0) {
+                    setError('Account not found. Please check your Login ID (email or phone number used during registration).');
                     return;
                 }
-
-                // Verify password (simple check for now as per previous implementation)
-                if (user.password === password) {
-                    localStorage.setItem('userRole', 'client');
-                    localStorage.setItem('isLoggedIn', 'true');
-                    localStorage.setItem('clientName', user.company_name || user.name);
-                    navigate('/');
-                    return;
-                } else {
-                    setError('Invalid password.');
-                    setIsLoading(false);
-                    return;
-                }
+                matchedUsers.push(...altUsers);
             }
 
-            // 3. Fallback / Client Mock Logic (Preserving previous mock logic if DB fails or for demo)
-            // Client Mock Authentication
-            let companyName = "Valued Client Co.";
-            let displayName = "Client User";
-            let isValidMock = false;
+            const user = matchedUsers[0];
 
-            if (email.toLowerCase().includes('ashwini')) {
-                companyName = "Ashwini Steel Works";
-                displayName = "Ramesh Kumar";
-                isValidMock = true;
-            } else if (email.toLowerCase().includes('ta')) {
-                companyName = "Tata Motors";
-                displayName = "Suresh Operations";
-                isValidMock = true;
-            } else if (email.toLowerCase().includes('demo')) {
-                companyName = "Demo Client Ltd";
-                isValidMock = true;
-            }
-
-            if (isValidMock) {
-                localStorage.setItem('userRole', 'client');
-                localStorage.setItem('isLoggedIn', 'true');
-                localStorage.setItem('clientName', companyName);
-                localStorage.setItem('clientCompanyName', companyName);
-                localStorage.setItem('clientDisplayName', displayName);
-                navigate('/');
+            // Only allow 'client' role to access this portal
+            const allowedRoles = ['client', 'Client'];
+            if (!allowedRoles.includes(user.role)) {
+                setError('This account is not a client account. Staff/Admin must use the Admin Panel.');
                 return;
             }
 
-            setError('Invalid credentials or account not found.');
+            // Verify password
+            if (user.password !== password) {
+                setError('Incorrect password. Please try again.');
+                return;
+            }
+
+            // ✅ Login successful
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('userRole', 'client');
+            localStorage.setItem('clientName', user.name || user.displayName || loginId);
+            localStorage.setItem('clientUserId', user.id); // for linking trips
+            localStorage.setItem('clientEmail', user.email);
+            window.location.href = '/'; // Safari-safe navigation
 
         } catch (err) {
-            console.error("Login Error:", err);
-            setError('Connection error. Please try again.');
+            console.error('[ClientLogin] Error:', err);
+            setError(err.message || 'Login failed. Please try again.');
         } finally {
             setIsLoading(false);
         }
