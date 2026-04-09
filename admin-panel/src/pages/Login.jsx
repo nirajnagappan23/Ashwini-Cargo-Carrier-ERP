@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useAdmin } from '../context/AdminContext';
-import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, AlertCircle, Truck } from 'lucide-react';
 import { supabase } from '../supabase';
+import { safeSetItem } from '../utils/storage';
 import erpLogo from '../assets/erp_logo.jpg';
 
 const Login = () => {
     const { login } = useAdmin();
-    const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -20,7 +19,7 @@ const Login = () => {
         setIsLoading(true);
 
         try {
-            // 1. Strict Hardcoded Master Admin Check
+            // 1. Strict Hardcoded Master Admin Check (Safari-safe)
             if (email === 'nirajnagappan@gmail.com' && password === 'Niraj!!123') {
                 const masterUser = {
                     id: 'USR-001',
@@ -29,9 +28,10 @@ const Login = () => {
                     role: 'Master Admin',
                     status: 'Active'
                 };
-                localStorage.setItem('adminAuth', 'true');
-                localStorage.setItem('adminUser', JSON.stringify(masterUser));
-                navigate('/');
+                safeSetItem('adminAuth', 'true');
+                safeSetItem('adminUser', JSON.stringify(masterUser));
+                // Use window.location for Safari PWA compatibility (navigate() can fail in Safari)
+                window.location.href = '/';
                 return;
             }
 
@@ -47,9 +47,10 @@ const Login = () => {
 
             if (matchedUsers && matchedUsers.length > 0) {
                 const user = matchedUsers[0];
-                localStorage.setItem('adminAuth', 'true');
-                localStorage.setItem('adminUser', JSON.stringify(user));
-                navigate('/');
+                safeSetItem('adminAuth', 'true');
+                safeSetItem('adminUser', JSON.stringify(user));
+                // Use window.location for Safari PWA compatibility
+                window.location.href = '/';
             } else {
                 setError('Invalid Administrator credentials.');
             }

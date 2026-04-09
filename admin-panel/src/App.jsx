@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AdminProvider } from './context/AdminContext';
+import { safeGetItem } from './utils/storage';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Orders from './pages/Orders';
@@ -22,8 +23,8 @@ const AdminProtectedRoute = ({ children }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Check for auth token in local storage
-    const storedAuth = localStorage.getItem('adminAuth');
+    // Safari-safe: use safeGetItem that falls back to sessionStorage / memory
+    const storedAuth = safeGetItem('adminAuth');
 
     if (storedAuth === 'true') {
       setIsAuthenticated(true);
@@ -43,7 +44,7 @@ const AdminProtectedRoute = ({ children }) => {
 };
 
 const RoleProtectedRoute = ({ children, restrictedRole }) => {
-  const userStr = localStorage.getItem('adminUser');
+  const userStr = safeGetItem('adminUser');
   const user = userStr ? JSON.parse(userStr) : null;
 
   if (user && user.role === restrictedRole) {

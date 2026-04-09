@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import { safeRemoveItem } from '../utils/storage';
 
 const AdminContext = createContext();
 
@@ -155,8 +156,8 @@ export const AdminProvider = ({ children }) => {
     };
 
     const logout = () => {
-        localStorage.removeItem('adminAuth');
-        localStorage.removeItem('adminUser');
+        safeRemoveItem('adminAuth');
+        safeRemoveItem('adminUser');
         window.location.href = '/login';
     };
 
