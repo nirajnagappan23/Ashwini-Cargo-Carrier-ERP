@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, AlertCircle, Truck } from 'lucide-react';
+import { supabase } from '../supabase';
 import erpLogo from '../assets/erp_logo.jpg';
 
 const Login = () => {
@@ -18,33 +19,46 @@ const Login = () => {
         setError('');
         setIsLoading(true);
 
-        // Simulate network delay for better UX
-        setTimeout(() => {
-            // 1. Strict Hardcoded Master Admin Check (As requested)
+        try {
+            // 1. Strict Hardcoded Master Admin Check
             if (email === 'nirajnagappan@gmail.com' && password === 'Niraj!!123') {
-                // Success - manually trigger context login if needed, or just set token
-                // We'll use the context method if it supports manual override, otherwise we force it.
-                // Assuming login() takes credentials and handles state.
-                const success = login(email, password);
-                if (success) {
-                    navigate('/');
-                } else {
-                    // Fallback if context logic differs
-                    localStorage.setItem('adminToken', 'master-admin-token');
-                    navigate('/');
-                }
-            } else {
-                // Check if user is trying to access Client Portal
-                if (email.toLowerCase().includes('ashwini') ||
-                    email.toLowerCase().includes('client') ||
-                    !email.includes('@')) {
-                    setError('Client accounts must use the Client Portal.');
-                } else {
-                    setError('Invalid Administrator credentials.');
-                }
+                const masterUser = {
+                    id: 'USR-001',
+                    name: 'Niraj',
+                    email: 'nirajnagappan@gmail.com',
+                    role: 'Master Admin',
+                    status: 'Active'
+                };
+                localStorage.setItem('adminAuth', 'true');
+                localStorage.setItem('adminUser', JSON.stringify(masterUser));
+                navigate('/');
+                return;
             }
+
+            // 2. Query Supabase directly — avoids race condition with context loading
+            const { data: matchedUsers, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', email)
+                .eq('password', password)
+                .neq('role', 'client'); // Only admin/manager roles allowed here
+
+            if (error) throw error;
+
+            if (matchedUsers && matchedUsers.length > 0) {
+                const user = matchedUsers[0];
+                localStorage.setItem('adminAuth', 'true');
+                localStorage.setItem('adminUser', JSON.stringify(user));
+                navigate('/');
+            } else {
+                setError('Invalid Administrator credentials.');
+            }
+        } catch (err) {
+            console.error('Login error:', err);
+            setError('Login failed. Please try again.');
+        } finally {
             setIsLoading(false);
-        }, 800);
+        }
     };
 
     return (
