@@ -186,6 +186,7 @@ export const AdminProvider = ({ children }) => {
             clientRef,
             orderId,
             orderDate,
+            documents: orderData.documents || [],
             ...orderData, // Contains camelCase and logic needed for UI
             consignments: [],
             trackingHistory: [{ status: 'Order Confirmed', location: '-', date: new Date().toLocaleString('en-GB'), completed: true }]
@@ -228,7 +229,7 @@ export const AdminProvider = ({ children }) => {
             materials: orderData.materials || [],
             consignments: [],
             tracking_history: [{ status: 'Order Confirmed', location: '-', date: new Date().toLocaleString('en-GB'), completed: true }],
-            documents: [],
+            documents: orderData.documents || [],
             chats: [],
             created_at: new Date().toISOString()
         };

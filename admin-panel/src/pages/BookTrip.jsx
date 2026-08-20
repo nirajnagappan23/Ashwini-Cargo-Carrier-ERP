@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAdmin } from '../context/AdminContext';
-import { ArrowLeft, Plus, Trash2, Truck, MapPin, Package, Edit2, Check, User, DollarSign, Calculator, FileText } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Truck, MapPin, Package, Edit2, Check, User, DollarSign, Calculator, FileText, Upload, CheckCircle } from 'lucide-react';
 import { generateOrderNumber, formatDate } from '../utils/numberingSystem';
 import './BookTrip.css';
 
@@ -74,6 +74,173 @@ const BookTrip = () => {
     // --- New Fields ---
     const [lrNumber, setLrNumber] = useState('');
     const [selectedEnquiryId, setSelectedEnquiryId] = useState('');
+
+    // --- LR Copy OCR & Upload State ---
+    const [processingLR, setProcessingLR] = useState(false);
+    const [lrScanMessage, setLrScanMessage] = useState('');
+    const [uploadedLRDoc, setUploadedLRDoc] = useState(null);
+
+    const handleLRScan = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setProcessingLR(true);
+        setLrScanMessage('Reading LR file...');
+
+        const fileUrl = URL.createObjectURL(file);
+        const docObj = {
+            name: file.name || "Master LR Copy",
+            type: "LR Copy",
+            uploadedBy: "Admin",
+            url: fileUrl,
+            date: new Date().toISOString().split('T')[0]
+        };
+        setUploadedLRDoc(docObj);
+
+        if (file.type === 'application/pdf') {
+            setLrScanMessage('');
+            setProcessingLR(false);
+            alert("Master LR PDF attached! PDF auto-scan is not available for full text extraction, but the document will be saved with the new trip.");
+            return;
+        }
+
+        try {
+            setLrScanMessage('Scanning text with OCR (Tesseract)...');
+            const { createWorker } = await import('tesseract.js');
+            const worker = await createWorker('eng');
+            const ret = await worker.recognize(file);
+            const text = ret.data.text;
+            await worker.terminate();
+
+            console.log("OCR Extracted Text from LR:", text);
+
+            const extractValue = (regex) => {
+                const match = text.match(regex);
+                return match ? match[1].trim() : null;
+            };
+
+            // Extracted Fields
+            const extLR = extractValue(/LR\s*(?:No|Number|#)[:\.]?\s*([A-Z0-9\/-]+)/i) || extractValue(/(?:LR|Bkg)\s*[:\.]?\s*([A-Z0-9\/-]+)/i) || extractValue(/No[:\.]?\s*(\d{4,10})/i);
+            const extTruck = extractValue(/(?:Truck|Lorry|Vehicle)\s*(?:No|Number|#)?[:\.]?\s*([A-Z]{2}\s*\d{1,2}\s*[A-Z]{0,3}\s*\d{4})/i) || extractValue(/([A-Z]{2}\d{2}[A-Z]{1,2}\d{4})/i);
+            const extDriverPhone = extractValue(/(?:Mobile|Phone|Driver\s*Ph|Ph)[:\.]?\s*(\d{10})/i) || extractValue(/(\d{10})/);
+            const extFreightRaw = extractValue(/Total\s*Freight[:\s]*([\d,]+)/i) || extractValue(/Freight[:\s]*([\d,]+)/i) || extractValue(/Rate[:\s]*([\d,]+)/i);
+            const extFreight = extFreightRaw ? parseFloat(extFreightRaw.replace(/,/g, '')) : null;
+            const extAdvanceRaw = extractValue(/Advance[:\s]*([\d,]+)/i);
+            const extAdvance = extAdvanceRaw ? parseFloat(extAdvanceRaw.replace(/,/g, '')) : null;
+            const extPaymentMode = extractValue(/Payment\s*Status[:\s]*(Paid|To Pay)/i) || extractValue(/(To\s*Pay|Paid)/i);
+            const extDate = extractValue(/Date[:\s]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{2,4})/i) || extractValue(/Date[:\s]*(\d{4}[\/\.-]\d{2}[\/\.-]\d{2})/i);
+            
+            const extConsignor = extractValue(/Consignor[:\s]*(.*)/i) || extractValue(/From[:\s]*(.*)/i);
+            const extConsignee = extractValue(/Consignee[:\s]*(.*)/i) || extractValue(/To[:\s]*(.*)/i);
+            const extMaterial = extractValue(/Material[:\s]*(.*)/i) || extractValue(/Goods[:\s]*(.*)/i) || extractValue(/Description[:\s]*(.*)/i);
+            const extWeight = extractValue(/Weight[:\s]*([\d\.]+)/i);
+
+            let fieldsFoundCount = 0;
+            let summary = "Extracted Details from LR Copy:\n";
+
+            if (extLR) {
+                setLrNumber(extLR.toUpperCase());
+                summary += `• LR Number: ${extLR.toUpperCase()}\n`;
+                fieldsFoundCount++;
+            }
+
+            if (extTruck || extDriverPhone) {
+                setTruckDetails(prev => ({
+                    ...prev,
+                    truckNo: extTruck ? extTruck.toUpperCase() : prev.truckNo,
+                    driverPhone: extDriverPhone || prev.driverPhone
+                }));
+                if (extTruck) { summary += `• Truck No: ${extTruck.toUpperCase()}\n`; fieldsFoundCount++; }
+                if (extDriverPhone) { summary += `• Driver Phone: ${extDriverPhone}\n`; fieldsFoundCount++; }
+            }
+
+            if (extFreight !== null || extAdvance !== null || extPaymentMode) {
+                setFinancials(prev => {
+                    const updatedFreight = extFreight !== null ? extFreight : prev.freightAmount;
+                    const updatedAdvance = extAdvance !== null ? extAdvance : prev.advance;
+                    let paymentBy = prev.paymentBy;
+                    if (extPaymentMode) {
+                        paymentBy = extPaymentMode.toLowerCase().includes('to pay') ? 'Consignee' : 'Consignor';
+                    }
+                    return {
+                        ...prev,
+                        freightAmount: updatedFreight,
+                        advance: updatedAdvance,
+                        paymentBy: paymentBy
+                    };
+                });
+                if (extFreight) { summary += `• Freight: ₹${extFreight}\n`; fieldsFoundCount++; }
+                if (extAdvance) { summary += `• Advance: ₹${extAdvance}\n`; fieldsFoundCount++; }
+                if (extPaymentMode) { summary += `• Payment Mode: ${extPaymentMode}\n`; fieldsFoundCount++; }
+            }
+
+            if (extDate) {
+                try {
+                    const parts = extDate.split(/[\/\.-]/);
+                    if (parts.length === 3) {
+                        let formattedDate = extDate;
+                        if (parts[0].length === 2 && parts[2].length === 4) {
+                            formattedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                        }
+                        setPickupDate(formattedDate);
+                        summary += `• Pickup Date: ${formattedDate}\n`;
+                        fieldsFoundCount++;
+                    }
+                } catch (err) {}
+            }
+
+            if (extConsignor) {
+                const cleanCity = extConsignor.split(',')[0].trim();
+                if (cleanCity) {
+                    setPickups(prev => prev.map((p, i) => i === 0 ? { ...p, city: cleanCity, isEditing: false } : p));
+                    summary += `• Pickup City (Consignor): ${cleanCity}\n`;
+                    fieldsFoundCount++;
+                }
+            }
+
+            if (extConsignee) {
+                const cleanCity = extConsignee.split(',')[0].trim();
+                if (cleanCity) {
+                    setDrops(prev => prev.map((d, i) => i === 0 ? { ...d, city: cleanCity, companyName: extConsignee, isEditing: false } : d));
+                    summary += `• Drop City (Consignee): ${cleanCity}\n`;
+                    fieldsFoundCount++;
+                }
+            }
+
+            if (extMaterial || extWeight) {
+                setMaterials(prev => prev.map((m, i) => i === 0 ? { ...m, type: extMaterial || m.type, weight: extWeight || m.weight, isEditing: false } : m));
+                if (extMaterial) summary += `• Material: ${extMaterial}\n`;
+                if (extWeight) summary += `• Weight: ${extWeight} MT\n`;
+                fieldsFoundCount++;
+            }
+
+            if (clients && clients.length > 0) {
+                const matchedClient = clients.find(c => text.toLowerCase().includes(c.name.toLowerCase()));
+                if (matchedClient) {
+                    setClientDetails({
+                        name: matchedClient.name,
+                        phone: matchedClient.phone,
+                        email: matchedClient.email
+                    });
+                    summary += `• Client Matched: ${matchedClient.name}\n`;
+                    fieldsFoundCount++;
+                }
+            }
+
+            if (fieldsFoundCount > 0) {
+                alert(`${summary}\nAll available fields have been auto-populated in the form! Please review and click 'Book Trip' when ready.`);
+            } else {
+                alert("Master LR attached successfully! Text scan could not identify specific patterns; please fill the form fields manually.");
+            }
+
+        } catch (err) {
+            console.error("LR OCR Error:", err);
+            alert("Master LR attached! Text scanning had an issue; please fill the form fields manually.");
+        } finally {
+            setProcessingLR(false);
+            setLrScanMessage('');
+        }
+    };
 
     // Truck Allocation
     const [truckDetails, setTruckDetails] = useState({
@@ -448,6 +615,10 @@ const BookTrip = () => {
             // Truck Info
             loadType,
             truckDetails: truckDetails,
+            vehicleNo: truckDetails.truckNo,
+            driverPhone: truckDetails.driverPhone,
+
+            documents: uploadedLRDoc ? [uploadedLRDoc] : [],
 
             // Financials
             quoteAmount: totalFreight,
@@ -527,6 +698,108 @@ const BookTrip = () => {
             </div>
 
             <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.5rem', maxWidth: '1200px' }}>
+
+                {/* TOP BANNER: Upload & Auto-Fill from LR Copy */}
+                {!isEnquiryEdit && (
+                    <section style={{
+                        background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+                        padding: '1.5rem',
+                        borderRadius: '1rem',
+                        border: '2px dashed #6366f1',
+                        boxShadow: '0 4px 6px -1px rgba(99, 102, 241, 0.1)',
+                        position: 'relative'
+                    }}>
+                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '12px',
+                                    background: '#4f46e5',
+                                    color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 4px rgba(79, 70, 229, 0.3)'
+                                }}>
+                                    <FileText size={26} />
+                                </div>
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <h2 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#1e1b4b', margin: 0 }}>
+                                            Auto-Fill Trip from LR Copy
+                                        </h2>
+                                        <span style={{
+                                            fontSize: '0.7rem',
+                                            background: '#818cf8',
+                                            color: 'white',
+                                            fontWeight: '700',
+                                            padding: '0.15rem 0.5rem',
+                                            borderRadius: '9999px',
+                                            textTransform: 'uppercase'
+                                        }}>
+                                            Instant OCR
+                                        </span>
+                                    </div>
+                                    <p style={{ fontSize: '0.85rem', color: '#4338ca', margin: '0.25rem 0 0 0' }}>
+                                        Upload an LR Copy (Image or PDF) to automatically extract LR #, Truck, Driver, Freight & Route details.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    background: '#4f46e5',
+                                    color: 'white',
+                                    padding: '0.75rem 1.25rem',
+                                    borderRadius: '0.5rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.9rem',
+                                    cursor: processingLR ? 'not-allowed' : 'pointer',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                                    opacity: processingLR ? 0.7 : 1,
+                                    transition: 'all 0.2s'
+                                }}>
+                                    <Upload size={18} />
+                                    {processingLR ? (lrScanMessage || 'Scanning LR Copy...') : 'Upload LR Copy & Auto-Fill'}
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/*,application/pdf"
+                                        onChange={handleLRScan}
+                                        disabled={processingLR}
+                                    />
+                                </label>
+                            </div>
+                        </div>
+
+                        {uploadedLRDoc && (
+                            <div style={{
+                                marginTop: '1rem',
+                                padding: '0.75rem 1rem',
+                                background: 'white',
+                                borderRadius: '0.5rem',
+                                border: '1px solid #c7d2fe',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                fontSize: '0.85rem',
+                                color: '#1e1b4b'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '500' }}>
+                                    <CheckCircle size={18} style={{ color: '#059669' }} />
+                                    Attached Master LR Copy: <strong style={{ fontFamily: 'monospace' }}>{uploadedLRDoc.name}</strong>
+                                </div>
+                                <span style={{ background: '#ecfdf5', color: '#047857', fontWeight: '600', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', fontSize: '0.75rem' }}>
+                                    Attached & Ready for Trip
+                                </span>
+                            </div>
+                        )}
+                    </section>
+                )}
 
                 {/* 0. Primary Details (LR & Enquiry) */}
                 {/* 0. Primary Details (LR & Enquiry) - Hide in Enquiry Edit Mode */}
