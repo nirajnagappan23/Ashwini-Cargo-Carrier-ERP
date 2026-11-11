@@ -3,20 +3,15 @@ import { FileText, Download, Upload, Eye, Plus, ChevronDown, ChevronUp } from 'l
 import { useApp } from '../context/AppContext';
 
 const Documents = () => {
-    const { enquiries } = useApp();
+    const { enquiries, addDocument } = useApp();
     const [expandedTrip, setExpandedTrip] = useState(null);
     const [customDocName, setCustomDocName] = useState('');
     const [selectedUploadCategory, setSelectedUploadCategory] = useState('E-Way Bill');
     const [uploadingFor, setUploadingFor] = useState(null); // Trip ID being uploaded for
+    const [isUploading, setIsUploading] = useState(false);
 
-    // Mock Documents Data mapped to Enquiries
-    // In a real app, this would be fetched from backend based on enquiry ID
-    const getDocumentsForEnquiry = (enquiryId) => {
-        // returning mock data mixed with static structure
-        return [
-            { name: 'E-Way Bill', type: 'Client', date: '2025-01-02', url: '#' },
-            { name: 'LR Copy', type: 'Admin', date: '2025-01-03', url: '#' },
-        ];
+    const getDocumentsForEnquiry = (enquiry) => {
+        return (enquiry?.documents || []).filter((d) => d?.type !== 'enquiry_meta');
     };
 
     const clientDocTypes = [
@@ -36,11 +31,35 @@ const Documents = () => {
         setUploadingFor(enquiryId);
     };
 
-    const handleUploadSubmit = () => {
-        alert(`Uploading ${selectedUploadCategory === 'Otner (Custom)' ? customDocName : selectedUploadCategory} for ${uploadingFor}`);
-        setUploadingFor(null);
-        setCustomDocName('');
-        setSelectedUploadCategory('E-Way Bill');
+    const handleUploadSubmit = async () => {
+        if (!uploadingFor) return;
+        const docName =
+            selectedUploadCategory === 'Other (Custom)'
+                ? (customDocName || '').trim()
+                : selectedUploadCategory;
+
+        if (!docName) {
+            alert('Please enter a document name');
+            return;
+        }
+
+        try {
+            setIsUploading(true);
+            await addDocument(uploadingFor, {
+                name: docName,
+                type: 'Client',
+                uploadedBy: 'client',
+                url: '#',
+            });
+            alert('Document saved successfully');
+            setUploadingFor(null);
+            setCustomDocName('');
+            setSelectedUploadCategory('E-Way Bill');
+        } catch (err) {
+            alert(err.message || 'Failed to save document');
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     return (
@@ -114,7 +133,9 @@ const Documents = () => {
                                         </div>
                                         <div className="mt-4 flex justify-end gap-2">
                                             <button className="btn btn-outline text-xs px-4" onClick={() => setUploadingFor(null)}>Cancel</button>
-                                            <button className="btn btn-primary text-xs px-4" onClick={handleUploadSubmit}>Upload File</button>
+                                            <button className="btn btn-primary text-xs px-4" onClick={handleUploadSubmit} disabled={isUploading}>
+                                                {isUploading ? 'Saving...' : 'Upload File'}
+                                            </button>
                                         </div>
                                     </div>
                                 )}
@@ -126,7 +147,7 @@ const Documents = () => {
                                     <div>
                                         <h4 className="text-xs font-bold text-secondary uppercase tracking-wider mb-3 pb-1 border-b">Client Uploads</h4>
                                         <div className="space-y-2">
-                                            {getDocumentsForEnquiry(enq.id).filter(d => d.type === 'Client').map((doc, idx) => (
+                                            {getDocumentsForEnquiry(enq).filter(d => d.type === 'Client' || d.uploadedBy === 'client').map((doc, idx) => (
                                                 <div key={idx} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded border border-transparent hover:border-slate-100 group transition-all">
                                                     <div className="flex items-center gap-3">
                                                         <FileText size={16} className="text-blue-500" />
@@ -154,19 +175,34 @@ const Documents = () => {
                                     <div>
                                         <h4 className="text-xs font-bold text-secondary uppercase tracking-wider mb-3 pb-1 border-b">Admin / Trip Docs</h4>
                                         <div className="space-y-2">
-                                            {/* Mock Admin Docs for this view */}
-                                            {adminDocTypes.map((name, idx) => (
+                                            {getDocumentsForEnquiry(enq).filter(d => d.type === 'Admin' || d.uploadedBy === 'admin').length === 0 && (
+                                                <div className="text-xs text-secondary italic py-2">No admin documents yet</div>
+                                            )}
+                                            {getDocumentsForEnquiry(enq).filter(d => d.type === 'Admin' || d.uploadedBy === 'admin').map((doc, idx) => (
                                                 <div key={idx} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded border border-transparent hover:border-slate-100 group transition-all">
                                                     <div className="flex items-center gap-3">
                                                         <FileText size={16} className="text-purple-500" />
                                                         <div>
-                                                            <div className="text-sm font-medium text-primary">{name}</div>
-                                                            <div className="text-[10px] text-secondary">Pending Upload</div>
+                                                            <div className="text-sm font-medium text-primary">{doc.name}</div>
+                                                            <div className="text-[10px] text-secondary">{doc.date || '-'}</div>
                                                         </div>
                                                     </div>
                                                     <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <span className="text-[10px] text-slate-400 italic px-2">Not yet available</span>
+                                                        <button className="p-1.5 hover:bg-blue-100 text-blue-600 rounded" title="View"><Eye size={14} /></button>
+                                                        <button className="p-1.5 hover:bg-green-100 text-green-600 rounded" title="Download"><Download size={14} /></button>
                                                     </div>
+                                                </div>
+                                            ))}
+                                            {adminDocTypes.filter(name => !getDocumentsForEnquiry(enq).some(d => d.name === name)).map((name, idx) => (
+                                                <div key={`pending-${idx}`} className="flex items-center justify-between p-2 rounded border border-transparent">
+                                                    <div className="flex items-center gap-3">
+                                                        <FileText size={16} className="text-slate-300" />
+                                                        <div>
+                                                            <div className="text-sm font-medium text-slate-400">{name}</div>
+                                                            <div className="text-[10px] text-secondary">Pending Upload</div>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-400 italic px-2">Not yet available</span>
                                                 </div>
                                             ))}
                                         </div>

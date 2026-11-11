@@ -36,24 +36,28 @@ const TripDetail = () => {
         setLightboxOpen(true);
     };
 
-    const handleUploadEntry = () => {
+    const handleUploadEntry = async () => {
         const finalName = docType === 'Other Document' ? customName : docType;
-        const finalType = docType === 'Other Document' ? 'Custom' : docType;
+        const finalType = docType === 'Other Document' ? 'Custom' : 'Client';
 
         if (docType === 'Other Document' && !customName.trim()) {
             alert("Please enter document name");
             return;
         }
 
-        addDocument(id, {
-            name: finalName,
-            type: finalType,
-            uploadedBy: 'Client',
-            url: '#'
-        });
-        setUploadModalOpen(false);
-        setCustomName('');
-        alert("Document Uploaded Successfully");
+        try {
+            await addDocument(id, {
+                name: finalName,
+                type: finalType,
+                uploadedBy: 'client',
+                url: '#'
+            });
+            setUploadModalOpen(false);
+            setCustomName('');
+            alert("Document Uploaded Successfully");
+        } catch (err) {
+            alert(err.message || 'Failed to upload document');
+        }
     };
 
     if (!trip) return <div className="p-8 text-center">Trip not found</div>;

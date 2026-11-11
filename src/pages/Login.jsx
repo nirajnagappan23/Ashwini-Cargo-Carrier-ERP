@@ -72,7 +72,8 @@ const Login = () => {
             localStorage.setItem('userRole', 'client');
             localStorage.setItem('clientName', user.name || user.displayName || loginId);
             localStorage.setItem('clientUserId', user.id); // for linking trips
-            localStorage.setItem('clientEmail', user.email);
+            localStorage.setItem('clientEmail', user.email || loginId);
+            localStorage.setItem('clientPhone', user.phone || '');
             window.location.href = '/'; // Safari-safe navigation
 
         } catch (err) {

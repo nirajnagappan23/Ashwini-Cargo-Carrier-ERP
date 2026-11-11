@@ -38,10 +38,31 @@ export const AdminProvider = ({ children }) => {
     const safeArray = (arr) => Array.isArray(arr) ? arr : [];
 
     // ---- MAPPER: DB (Snake) -> APP (Camel) ----
+    const extractEnquiryMeta = (documents = []) => {
+        const meta = safeArray(documents).find((d) => d?.type === 'enquiry_meta');
+        if (!meta) return {};
+        const { type, id, name, date, url, ...rest } = meta;
+        return rest;
+    };
+
+    const normalizeDrops = (drops = []) =>
+        safeArray(drops).map((d) => ({
+            ...d,
+            companyName: d.companyName || d.consigneeCompany || '',
+            phone: d.phone || d.consigneePhone || '',
+            consigneeCompany: d.consigneeCompany || d.companyName || '',
+            consigneePhone: d.consigneePhone || d.phone || '',
+        }));
+
     const mapDbOrderToApp = (dbOrder) => {
         if (!dbOrder) return null;
+        const documents = safeArray(dbOrder.documents);
+        const meta = extractEnquiryMeta(documents);
+        const origin = dbOrder.origin || meta.origin || '';
+        const destination = dbOrder.destination || meta.destination || '';
         return {
             ...dbOrder,
+            ...meta,
             orderId: dbOrder.order_id,
             orderDate: dbOrder.order_date,
             clientRef: dbOrder.client_ref,
@@ -69,15 +90,26 @@ export const AdminProvider = ({ children }) => {
             paymentHistory: safeArray(dbOrder.payment_history),
             truckPaymentHistory: safeArray(dbOrder.truck_payment_history),
             truckExpenses: safeArray(dbOrder.truck_expenses),
-            documents: safeArray(dbOrder.documents),
+            documents,
             chats: safeArray(dbOrder.chats),
             driverPhotos: safeArray(dbOrder.driver_photos),
             loadingPhotos: safeArray(dbOrder.loading_photos),
             unloadingPhotos: safeArray(dbOrder.unloading_photos),
             pickups: safeArray(dbOrder.pickups),
-            drops: safeArray(dbOrder.drops),
+            drops: normalizeDrops(dbOrder.drops),
             materials: safeArray(dbOrder.materials),
-            consignments: safeArray(dbOrder.consignments)
+            consignments: safeArray(dbOrder.consignments),
+            route:
+                meta.route ||
+                dbOrder.route ||
+                (origin && destination ? `${origin} -> ${destination}` : 'Unknown Route'),
+            enquiryNumber: meta.enquiryNumber || dbOrder.order_id || dbOrder.id,
+            pickupDate: meta.pickupDate || dbOrder.order_date || '',
+            paymentBy: meta.paymentBy || dbOrder.pay_type || 'Consignor',
+            loadType: meta.loadType || dbOrder.vehicle_type || 'FTL',
+            requestedTrucks: meta.requestedTrucks || [],
+            expiresAt: meta.expiresAt || null,
+            status: dbOrder.status || (dbOrder.trip_status ? 'Confirmed' : 'Requested'),
         };
     };
 
@@ -238,7 +270,16 @@ export const AdminProvider = ({ children }) => {
         Object.keys(newOrderDB).forEach(key => newOrderDB[key] === undefined && delete newOrderDB[key]);
 
         setOrders([...orders, newOrderApp]);
-        try { await supabase.from('orders').insert([newOrderDB]); } catch (e) { console.error("addOrder Error:", e); }
+        try {
+            const { error } = await supabase.from('orders').insert([newOrderDB]);
+            if (error) {
+                console.error("addOrder Error:", error);
+                throw error;
+            }
+        } catch (e) {
+            console.error("addOrder Error:", e);
+            throw e;
+        }
     };
 
     const updateOrderStatus = async (orderId, status) => {
@@ -255,11 +296,25 @@ export const AdminProvider = ({ children }) => {
         if (updates.driverName !== undefined) dbUpdates.driver_name = updates.driverName;
         if (updates.driverPhone !== undefined) dbUpdates.driver_phone = updates.driverPhone;
         if (updates.tripStatus !== undefined) dbUpdates.trip_status = updates.tripStatus;
+        if (updates.status !== undefined) dbUpdates.status = updates.status;
         if (updates.totalFreight !== undefined) dbUpdates.total_freight = updates.totalFreight;
         if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
         if (updates.paymentMode !== undefined) dbUpdates.payment_mode = updates.paymentMode;
+        if (updates.payType !== undefined) dbUpdates.pay_type = updates.payType;
+        if (updates.paymentBy !== undefined) dbUpdates.pay_type = updates.paymentBy;
         if (updates.documents !== undefined) dbUpdates.documents = updates.documents;
         if (updates.clientName !== undefined) dbUpdates.client_name = updates.clientName;
+        if (updates.clientPhone !== undefined) dbUpdates.client_phone = updates.clientPhone;
+        if (updates.clientEmail !== undefined) dbUpdates.client_email = updates.clientEmail;
+        if (updates.origin !== undefined) dbUpdates.origin = updates.origin;
+        if (updates.destination !== undefined) dbUpdates.destination = updates.destination;
+        if (updates.pickups !== undefined) dbUpdates.pickups = updates.pickups;
+        if (updates.drops !== undefined) dbUpdates.drops = normalizeDrops(updates.drops);
+        if (updates.materials !== undefined) dbUpdates.materials = updates.materials;
+        if (updates.quoteAmount !== undefined) dbUpdates.quote_amount = updates.quoteAmount;
+        if (updates.clientPrice !== undefined) dbUpdates.client_price = updates.clientPrice;
+        if (updates.trackingHistory !== undefined) dbUpdates.tracking_history = updates.trackingHistory;
+        if (updates.chats !== undefined) dbUpdates.chats = updates.chats;
         // For photos
         if (updates.driverPhotos !== undefined) dbUpdates.driver_photos = updates.driverPhotos;
         if (updates.loadingPhotos !== undefined) dbUpdates.loading_photos = updates.loadingPhotos;
@@ -267,7 +322,10 @@ export const AdminProvider = ({ children }) => {
 
 
         if (Object.keys(dbUpdates).length > 0) {
-            try { await supabase.from('orders').update(dbUpdates).eq('id', orderId); } catch (e) { console.error(e); }
+            try {
+                const { error } = await supabase.from('orders').update(dbUpdates).eq('id', orderId);
+                if (error) console.error('updateOrderDetails Error:', error);
+            } catch (e) { console.error(e); }
         }
     };
 

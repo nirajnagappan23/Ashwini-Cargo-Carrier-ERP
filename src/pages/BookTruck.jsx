@@ -179,13 +179,16 @@ const BookTruck = () => {
         setShowForm(true);
     };
 
-    const handleCancel = (id) => {
-        if (window.confirm("Are you sure you want to cancel this enquiry?")) {
-            updateEnquiryStatus(id, 'Cancelled');
+    const handleCancel = async (id) => {
+        if (!window.confirm("Are you sure you want to cancel this enquiry?")) return;
+        try {
+            await updateEnquiryStatus(id, 'Cancelled');
+        } catch (err) {
+            alert(err.message || 'Failed to cancel enquiry. Please try again.');
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         // Basic Route Construct
         const fromCity = pickups[0]?.city || 'Unknown';
@@ -241,39 +244,55 @@ const BookTruck = () => {
         });
 
         // Auto-generate enquiry number and dates
-        const enquiryNumber = generateEnquiryNumber();
-        const currentDate = formatDate();
+        const enquiryNumber = editingEnquiryId
+            ? (enquiries.find(e => e.id === editingEnquiryId)?.enquiryNumber || generateEnquiryNumber())
+            : generateEnquiryNumber();
         const expiryDate = getEnquiryExpiry(new Date());
+
+        const normalizedDrops = drops.map(d => ({
+            ...d,
+            companyName: d.companyName || d.consigneeCompany || '',
+            phone: d.phone || d.consigneePhone || '',
+            consigneeCompany: d.consigneeCompany || d.companyName || '',
+            consigneePhone: d.consigneePhone || d.phone || '',
+        }));
 
         // Add to Context
         const enquiryData = {
-            enquiryNumber: enquiryNumber,        // Auto-generated: ENQ-XXX/DD-MMM-YY
+            enquiryNumber,
             createdAt: new Date().toISOString(),
             expiresAt: expiryDate.toISOString(),
             route: `${fromCity} -> ${toCity}`,
+            origin: fromCity,
+            destination: toCity,
             pickupDate,
             pickups,
-            drops,
+            drops: normalizedDrops,
             materials,
             loadType,
             requestedTrucks: loadType === 'FTL' ? truckTypes : [],
             paymentBy,
+            clientName: localStorage.getItem('clientName') || '',
+            clientEmail: localStorage.getItem('clientEmail') || '',
+            clientPhone: localStorage.getItem('clientPhone') || '',
+            clientUserId: localStorage.getItem('clientUserId') || '',
         };
 
-        if (editingEnquiryId) {
-            // Update Existing
-            const currentEnquiry = enquiries.find(e => e.id === editingEnquiryId);
-            updateEnquiryStatus(editingEnquiryId, currentEnquiry.status, enquiryData);
-            alert("Enquiry Updated Successfully!");
-            setEditingEnquiryId(null);
-        } else {
-            // Add New
-            addEnquiry(enquiryData);
-            alert(`Enquiry ${enquiryNumber} Submitted Successfully!`);
+        try {
+            if (editingEnquiryId) {
+                const currentEnquiry = enquiries.find(e => e.id === editingEnquiryId);
+                await updateEnquiryStatus(editingEnquiryId, currentEnquiry?.status || 'Requested', enquiryData);
+                alert("Enquiry Updated Successfully!");
+                setEditingEnquiryId(null);
+            } else {
+                await addEnquiry(enquiryData);
+                alert(`Enquiry ${enquiryNumber} Submitted Successfully!`);
+            }
+            navigate('/');
+        } catch (err) {
+            console.error('BookTruck submit failed:', err);
+            alert(err.message || 'Failed to save enquiry. Please try again.');
         }
-
-        // Duplicate alert removed
-        navigate('/');
     };
 
 
