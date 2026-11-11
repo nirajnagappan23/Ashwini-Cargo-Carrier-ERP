@@ -4,7 +4,6 @@ import erpLogo from '../assets/erp_logo.jpg';
 import { supabase } from '../supabase';
 
 const Login = () => {
-    const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
